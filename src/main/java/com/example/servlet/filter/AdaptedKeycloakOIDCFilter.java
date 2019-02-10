@@ -138,7 +138,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
 
         if (principal != null) {
-            log.warn("found jira user " + principal.getName()+" so we continue the filter chain");
+            log.warn("found jira user " + principal.getName() + " so we continue the filter chain");
+            chain.doFilter(req, res);
             return;
         }
         while (enumeration.hasMoreElements()) {
@@ -155,7 +156,9 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 log.warn("Found a valid KC user, attempting login");
                 User user = getCrowdService().getUser(account.getToken().getPreferredUsername());
                 if (user == null) {
-                    log.warn("User is in keycloak, but isnt added to jira");
+                    log.warn("User is in keycloak, but isn't added to jira");
+                    chain.doFilter(req, res);
+                    return;
                 } else {
                     Object object = session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     if (object != null) {
@@ -164,6 +167,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                     }
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
                     log.warn("Set the session attribute " + JiraSeraphAuthenticator.LOGGED_IN_KEY + " for user " + user.getDisplayName());
+                    chain.doFilter(req, res);
+                    return;
                 }
             }
         }

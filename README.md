@@ -22,8 +22,8 @@ If you just want to use this plugin in your Jira deployment without making chang
 1. Create an appropriate client for Jira at your Keycloak server
 2. Adjust the keycloak.json file accordingly
 3. Open your favourite command shell and navigate into the root directory of this git project, that is the folder holding the pom.xml
-4. Execute 'atlas-package' or 'atlas-mvn package' in your shell
+4. Execute 'atlas-package' or 'atlas-mvn package' in your shell, they basically do the same exact thing anyways
 5. Upload the plugin to your Jira deployment
 #Troubleshooting
-* If you are using Atlassian's quickreload feature in development you should delete your session cookies before further testing. You will run into Classcastexceptions otherwise
+* If you are using Atlassian's quick reload feature in development you should delete your session cookies before further testing. You will run into Classcastexceptions otherwise. This is most often accomplished by simply restarting your browser since session cookies usually expire upon browser shutdown.
 * You can send me an email at [sebastian.boehringer@freenet.de](mailto:sebastian.boehringer@freenet.de). Please be aware that I will most likely *not* answer requests concerning this plugin or security issues. This plugin neither claims its the most optimal nor most efficient solution to integrate Keycloak into your Jira deployment. You are most likely better of using a commercial plugin.
