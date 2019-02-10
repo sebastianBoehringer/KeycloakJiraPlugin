@@ -1,4 +1,29 @@
 package com.example.servlet.filter;
+/*
+ * Adapted from https://github.com/keycloak/keycloak/blob/master/adapters/oidc/servlet-filter/src/main/java/org/keycloak/adapters/servlet/KeycloakOIDCFilter.java
+ * I changed the logger and added further debugging messages relevant to me
+ * I also edited the standard location of the keycloak file
+ * Furthermore i added functionality to also add a jira login to the httpsession
+ * I needed to copy some methods over in a one-to-one session since they were private in the superclass
+ * Below you will find the original copyright statement
+ */
+
+/*
+ * Copyright 2016 Red Hat, Inc. and/or its affiliates
+ * and other contributors as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 
 import com.atlassian.crowd.embedded.api.CrowdService;
@@ -8,7 +33,7 @@ import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
-import org.keycloak.adapters.servlet.FilterSessionStore;
+import org.keycloak.adapters.servlet.KeycloakOIDCFilter;
 import org.keycloak.adapters.servlet.OIDCFilterSessionStore;
 import org.keycloak.adapters.servlet.OIDCServletHttpFacade;
 import org.keycloak.adapters.spi.*;
@@ -20,26 +45,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
 import java.util.Enumeration;
 import java.util.List;
-
-
 import java.util.regex.Pattern;
 
-public class KeycloakOIDCFilter implements Filter {
 
-    private final static Logger log = LoggerFactory.getLogger("" + KeycloakOIDCFilter.class);
+public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
-    public static final String SKIP_PATTERN_PARAM = "keycloak.config.skipPattern";
-
-    public static final String CONFIG_RESOLVER_PARAM = "keycloak.config.resolver";
-
-    public static final String CONFIG_FILE_PARAM = "keycloak.json";
+    private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     public static final String CONFIG_PATH_PARAM = "../../../../";
 
@@ -59,12 +75,12 @@ public class KeycloakOIDCFilter implements Filter {
      *
      * @param definedconfigResolver the resolver
      */
-    public KeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver) {
+    public AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver) {
 
         this.definedconfigResolver = definedconfigResolver;
     }
 
-    public KeycloakOIDCFilter() {
+    public AdaptedKeycloakOIDCFilter() {
 
         this(null);
     }
@@ -76,45 +92,20 @@ public class KeycloakOIDCFilter implements Filter {
         if (skipPatternDefinition != null) {
             skipPattern = Pattern.compile(skipPatternDefinition, Pattern.DOTALL);
         }
-        if (definedconfigResolver != null) {
-            deploymentContext = new AdapterDeploymentContext(definedconfigResolver);
-            log.info("Using {0} to resolve Keycloak configuration on a per-request basis.", definedconfigResolver.getClass());
-        } else {
-            String configResolverClass = filterConfig.getInitParameter(CONFIG_RESOLVER_PARAM);
-            if (configResolverClass != null) {
-                try {
-                    KeycloakConfigResolver configResolver = (KeycloakConfigResolver) getClass().getClassLoader().loadClass(configResolverClass).newInstance();
-                    deploymentContext = new AdapterDeploymentContext(configResolver);
-                    log.info("Using {0} to resolve Keycloak configuration on a per-request basis.", configResolverClass);
-                } catch (Exception ex) {
-                    log.info("The specified resolver {0} could NOT be loaded. Keycloak is unconfigured and will deny all requests. Reason: {1}", new Object[]{configResolverClass, ex.getMessage()});
-                    deploymentContext = new AdapterDeploymentContext(new KeycloakDeployment());
-                }
-            } else {
-                String fp = filterConfig.getInitParameter(CONFIG_FILE_PARAM);
-                InputStream is = null;
-                if (fp != null) {
-                    try {
-                        is = new FileInputStream(fp);
-                        log.warn("found a file in " + fp);
-                    } catch (FileNotFoundException e) {
-                        log.warn("did not find file in " + fp);
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    String path = "/keycloak.json";
-                    String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
-                    if (pathParam != null) path = pathParam;
-                    log.warn("searching for config at path " + path);
-                    is = filterConfig.getServletContext().getResourceAsStream(path);
-                }
 
-                KeycloakDeployment kd = createKeycloakDeploymentFrom(is);
+        String path = "/keycloak.json";
+        String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
+        if (pathParam != null) path = pathParam;
+        log.warn("searching for config at path " + path);
+        InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
 
-                deploymentContext = new AdapterDeploymentContext(kd);
-                log.info("Keycloak is using a per-deployment configuration.");
-            }
-        }
+
+        KeycloakDeployment kd = this.createKeycloakDeploymentFrom(is);
+
+        deploymentContext = new AdapterDeploymentContext(kd);
+        log.info("Keycloak is using a per-deployment configuration.");
+
+
         filterConfig.getServletContext().setAttribute(AdapterDeploymentContext.class.getName(), deploymentContext);
         nodesRegistrationManagement = new NodesRegistrationManagement();
     }
@@ -146,9 +137,9 @@ public class KeycloakOIDCFilter implements Filter {
 
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
 
-
         if (principal != null) {
-            log.warn("found this noob " + principal.getName());
+            log.warn("found jira user " + principal.getName()+" so we continue the filter chain");
+            return;
         }
         while (enumeration.hasMoreElements()) {
             log.warn(enumeration.nextElement().toString());
@@ -168,7 +159,7 @@ public class KeycloakOIDCFilter implements Filter {
                 } else {
                     Object object = session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     if (object != null) {
-                        log.warn("removing session attribute "+JiraSeraphAuthenticator.LOGGED_OUT_KEY);
+                        log.warn("removing session attribute " + JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                         session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     }
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
@@ -266,10 +257,6 @@ public class KeycloakOIDCFilter implements Filter {
         return skipPattern.matcher(requestPath).matches();
     }
 
-    @Override
-    public void destroy() {
-
-    }
 
     private CrowdService getCrowdService() {
 

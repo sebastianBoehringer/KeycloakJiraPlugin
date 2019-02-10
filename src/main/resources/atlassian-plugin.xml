@@ -19,7 +19,7 @@
     <resource type="download" name="keycloak.json" location="/keycloak.json"/>
     <context>myFirstPlugin</context>
   </web-resource>
-  <servlet-filter name="Oidc Filter" i18n-name-key="oidc-filter.name" key="oidc-filter" class="com.example.servlet.filter.KeycloakOIDCFilter" location="before-dispatch" weight="100">
+  <servlet-filter name="Oidc Filter" i18n-name-key="oidc-filter.name" key="oidc-filter" class="com.example.servlet.filter.AdaptedKeycloakOIDCFilter" location="before-dispatch" weight="100">
     <description key="oidc-filter.description">The OpenId-Connect filter that is responsible for authentication against Keycloak</description>
     <url-pattern>/*</url-pattern>
   </servlet-filter>
