@@ -6,6 +6,7 @@ package com.example.servlet.filter;
  * Furthermore i added functionality to also add a jira login to the httpsession
  * I needed to copy some methods over in a one-to-one session since they were private in the superclass
  * Below you will find the original copyright statement
+ * Many thanks to the awesome Red Hat developers writing Keycloak, the servlet adapter and putting it all under Apache 2.0!
  */
 
 /*
@@ -135,6 +136,9 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         log.warn("User already has a session");
         Enumeration enumeration = session.getAttributeNames();
 
+        /*the LOGGED_IN_KEY and its counterpart LOGGED_OUT_KEY do exist and are fields of the DefaultAuthenticator the JiraSeraphAuthenticator extends
+        IntelliJ shows a false negative there
+        */
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
 
         if (principal != null) {

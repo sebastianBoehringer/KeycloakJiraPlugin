@@ -6,12 +6,26 @@
     <groupId>com.example</groupId>
     <artifactId>myFirstPlugin</artifactId>
     <version>1.0.0</version>
+    <developers>
+        <developer>
+            <name>Sebastian Boehringer</name>
+            <email>sebastian.boehringer@freenet.de</email>
+            <timezone>Europe/Berlin</timezone>
+            <roles>
+                <role>DH-Student</role>
+                <role>Tester</role>
+                <role>Lead-Developer</role>
+                <role>Praktikant</role>
+            </roles>
+        </developer>
+    </developers>
     <organization>
         <name>J. Schmalz GmbH</name>
         <url>http://www.schmalz.com/</url>
     </organization>
     <name>myFirstPlugin</name>
-    <description>This is a simple plugin attempting to authenticate Jira Users with open source software keycloak</description>
+    <description>This is a simple plugin attempting to authenticate Jira Users with open source software keycloak
+    </description>
     <packaging>atlassian-plugin</packaging>
     <dependencies>
         <dependency>
