@@ -30,7 +30,6 @@ import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
 import com.atlassian.jira.component.ComponentAccessor;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
-import com.atlassian.jira.user.DelegatingApplicationUser;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
@@ -99,11 +98,10 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         log.warn("searching for config at path " + path);
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
 
-
         KeycloakDeployment kd = this.createKeycloakDeploymentFrom(is);
 
         deploymentContext = new AdapterDeploymentContext(kd);
-        log.info("Keycloak is using a per-deployment configuration.");
+        log.debug("Keycloak is using a per-deployment configuration.");
 
 
         filterConfig.getServletContext().setAttribute(AdapterDeploymentContext.class.getName(), deploymentContext);
@@ -119,10 +117,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         return KeycloakDeploymentBuilder.build(is);
     }
 
-
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
-
 
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
@@ -133,25 +129,16 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         }
 
         HttpSession session = request.getSession();
-        Object abuser = session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
-        if (abuser != null) {
-            log.warn(abuser.getClass().getName());
-        }
-
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
-        boolean unexpectedClass = false;
         if (principal != null) {
-            if (principal instanceof DelegatingApplicationUser) {
-                log.info("found a jira user " + principal.getName() + ", resuming filter chain");
-                chain.doFilter(req, res);
-                return;
-            }
-            log.warn("unexpected class for user object");
-            unexpectedClass = true;
+
+            log.debug("found a jira user " + principal.getName() + ", resuming filter chain");
+            chain.doFilter(req, res);
+            return;
         }
 
         //Check for missing authentication
-        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY) == null || unexpectedClass) {
+        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY) == null) {
             RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
                     KeycloakSecurityContext.class.getName());
 
@@ -168,7 +155,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                         session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     }
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
-                    log.info("Successfully authenticated user " + user.getDisplayName() + " to Jira");
+                    log.debug("Successfully authenticated user " + user.getDisplayName() + " to Jira");
                     chain.doFilter(req, res);
                     return;
                 }
@@ -186,7 +173,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         PreAuthActionsHandler preActions = new PreAuthActionsHandler(new UserSessionManagement() {
             @Override
             public void logoutAll() {
-
+                //Using session might be nice but dunno at which time it might be called
+                log.warn("landed in logoutAll method");
                 if (idMapper != null) {
                     idMapper.clear();
                 }
@@ -194,8 +182,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
             @Override
             public void logoutHttpSessions(List<String> ids) {
-
-                log.info("**************** logoutHttpSessions");
+                log.warn("landed in logoutHttpSessions method");
+                log.debug("**************** logoutHttpSessions");
                 //System.err.println("**************** logoutHttpSessions");
                 for (String id : ids) {
                     log.debug("removed idMapper: " + id);
@@ -218,7 +206,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         FilterRequestAuthenticator authenticator = new FilterRequestAuthenticator(deployment, tokenStore, facade, request, 8443);
         AuthOutcome outcome = authenticator.authenticate();
         if (outcome == AuthOutcome.AUTHENTICATED) {
-            log.info("AUTHENTICATED");
+            log.debug("AUTHENTICATED");
             if (facade.isEnded()) {
                 return;
             }
@@ -233,12 +221,11 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         }
         AuthChallenge challenge = authenticator.getChallenge();
         if (challenge != null) {
-            log.info("challenge");
+            log.debug("challenge");
             challenge.challenge(facade);
             return;
         }
         response.sendError(403);
-
     }
 
     /**
@@ -252,14 +239,13 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * {@code false} otherwise.
      */
     private boolean shouldSkip(HttpServletRequest request) {
-        log.warn(request.getQueryString());
-        log.warn(request.getRequestURL().toString());
-        if (request.getRequestURI().contains("/rest")) {
-            log.info("skipping request " + request.getRequestURI());
+        String uri = request.getRequestURI();
+        if (uri.contains("/rest/") || uri.endsWith("/rest")) {
+            log.info("skipping request " + uri);
             return true;
         }
         if (skipPattern == null) {
-            log.info("Didnt skip the request");
+            log.debug("Didnt skip the request " + request.getRequestURI());
             return false;
         }
 
