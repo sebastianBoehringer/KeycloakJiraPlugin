@@ -26,11 +26,11 @@ package com.example.servlet.filter;
  * limitations under the License.
  */
 
-
 import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
 import com.atlassian.jira.component.ComponentAccessor;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
+import com.atlassian.jira.user.DelegatingApplicationUser;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
@@ -49,7 +49,6 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -124,7 +123,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
 
-        log.info("Keycloak OIDC Filter");
+
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
 
@@ -132,45 +131,44 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             chain.doFilter(req, res);
             return;
         }
+
         HttpSession session = request.getSession();
-        log.warn("User already has a session");
-        Enumeration enumeration = session.getAttributeNames();
+        Object abuser = session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
+        if (abuser != null) {
+            log.warn(abuser.getClass().getName());
+        }
 
-        /*the LOGGED_IN_KEY and its counterpart LOGGED_OUT_KEY do exist and are fields of the DefaultAuthenticator the JiraSeraphAuthenticator extends
-        IntelliJ shows a false negative there
-        */
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
-
+        boolean unexpectedClass = false;
         if (principal != null) {
-            log.warn("found jira user " + principal.getName() + " so we continue the filter chain");
-            chain.doFilter(req, res);
-            return;
+            if (principal instanceof DelegatingApplicationUser) {
+                log.info("found a jira user " + principal.getName() + ", resuming filter chain");
+                chain.doFilter(req, res);
+                return;
+            }
+            log.warn("unexpected class for user object");
+            unexpectedClass = true;
         }
-        while (enumeration.hasMoreElements()) {
-            log.warn(enumeration.nextElement().toString());
-        }
-        log.warn("end of enumeration");
-        //Prüfen darauf, dass sich der User nicht angemeldet hat und nicht darauf, dass er sich abgemeldet hat
-        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY) == null) {
-            log.warn("user is not logged in");
+
+        //Check for missing authentication
+        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY) == null || unexpectedClass) {
             RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
                     KeycloakSecurityContext.class.getName());
 
             if (account != null) {
-                log.warn("Found a valid KC user, attempting login");
+                log.info("Found a valid KC user, attempting login to jira");
                 User user = getCrowdService().getUser(account.getToken().getPreferredUsername());
                 if (user == null) {
-                    log.warn("User is in keycloak, but isn't added to jira");
+                    log.debug("Login failed. User is in keycloak, but not in jira.");
                     chain.doFilter(req, res);
                     return;
                 } else {
                     Object object = session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     if (object != null) {
-                        log.warn("removing session attribute " + JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                         session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                     }
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
-                    log.warn("Set the session attribute " + JiraSeraphAuthenticator.LOGGED_IN_KEY + " for user " + user.getDisplayName());
+                    log.info("Successfully authenticated user " + user.getDisplayName() + " to Jira");
                     chain.doFilter(req, res);
                     return;
                 }
@@ -181,7 +179,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         KeycloakDeployment deployment = deploymentContext.resolveDeployment(facade);
         if (deployment == null || !deployment.isConfigured()) {
             response.sendError(403);
-            log.error("deployment not configured");
+            log.error("Keycloak adapter not configured");
             return;
         }
 
@@ -211,7 +209,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             //System.err.println("**************** preActions.handleRequest happened!");
             return;
         }
-
 
         nodesRegistrationManagement.tryRegister(deployment);
         OIDCFilterSessionStore tokenStore = new OIDCFilterSessionStore(request, facade, 100000, deployment, idMapper);
@@ -255,18 +252,23 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * {@code false} otherwise.
      */
     private boolean shouldSkip(HttpServletRequest request) {
-
+        log.warn(request.getQueryString());
+        log.warn(request.getRequestURL().toString());
+        if (request.getRequestURI().contains("/rest")) {
+            log.info("skipping request " + request.getRequestURI());
+            return true;
+        }
         if (skipPattern == null) {
             log.info("Didnt skip the request");
             return false;
         }
 
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        log.warn("Evaluating the request with path " + requestPath);
+        log.warn("Possibly skipping the request with path " + requestPath);
         return skipPattern.matcher(requestPath).matches();
     }
 
-
+    //Jira uses crowd for its usermanagement
     private CrowdService getCrowdService() {
 
         return ComponentAccessor.getCrowdService();

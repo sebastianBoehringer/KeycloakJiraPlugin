@@ -9,7 +9,7 @@ Also if you are looking for actual support please investigate the marketplace fo
 #Getting this plugin running
 1. Make sure keycloak is running on localhost:8180. You can get that done via docker or just by downloading and unziping the official [distribution](https://www.keycloak.org/downloads.html)
 2. Create a user admin, so you can test immediately
-3. Make a basic realm and configure a client for Jira. Here are [some]() [links]() that might prove useful for this
+3. Make a basic realm and configure a client for Jira. Here are [some](https://www.keycloak.org/docs/latest/server_admin/index.html#_clients) [links](https://www.keycloak.org/docs/latest/server_admin/index.html#_create-realm) that might prove useful for this
 4. Edit the keycloak.json file according to your configuration
 2. If you did not already install the Atlassian SDK. Here is a link to a [tutorial](https://developer.atlassian.com/server/framework/atlassian-sdk/install-the-atlassian-sdk-on-a-windows-system/) for windows
 3. Clone this repository
@@ -18,6 +18,7 @@ Also if you are looking for actual support please investigate the marketplace fo
 6. Wait for Jira deployment to be finished
 7. Navigate to http://localhost:2990/jira. You should be redirected to a login page from keycloak. Login with user 'admin' and the password you configured
 8. You should now be logged into jira as well
+
 If you just want to use this plugin in your Jira deployment without making changes to it
 1. Create an appropriate client for Jira at your Keycloak server
 2. Adjust the keycloak.json file accordingly
@@ -27,3 +28,4 @@ If you just want to use this plugin in your Jira deployment without making chang
 #Troubleshooting
 * If you are using Atlassian's quick reload feature in development you should delete your session cookies before further testing. You will run into Classcastexceptions otherwise. This is most often accomplished by simply restarting your browser since session cookies usually expire upon browser shutdown.
 * You can send me an email at [sebastian.boehringer@freenet.de](mailto:sebastian.boehringer@freenet.de). Please be aware that I will most likely *not* answer requests concerning this plugin or security issues. This plugin neither claims its the most optimal nor most efficient solution to integrate Keycloak into your Jira deployment. You are most likely better of using a commercial plugin.
+* If you are avoiding the usage of the Atlassian SDK you might have to manually install the [jndi](https://www.oracle.com/technetwork/java/javasebusiness/downloads/java-archive-downloads-java-plat-419418.html) and [jta](http://download.oracle.com/otn-pub/java/jndi/1.2.1/jndi-1_2_1.zip) dependencies into your local maven repository as the needed versions aren't hosted on maven central anymore.

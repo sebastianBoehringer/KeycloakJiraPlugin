@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
-    <artifactId>myFirstPlugin</artifactId>
+    <artifactId>KeycloakJiraPlugin</artifactId>
     <version>1.0.0</version>
     <developers>
         <developer>
@@ -83,13 +83,7 @@
             <artifactId>keycloak-servlet-filter-adapter</artifactId>
             <version>4.8.3.Final</version>
         </dependency>
-        <!--
-        <dependency>
-            <groupId>guru.springframework</groupId>
-            <artifactId>chuck-norris-for-actuator</artifactId>
-            <version>0.0.2</version>
-        </dependency>
-        -->
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -145,11 +139,6 @@
             <scope>test</scope>
         </dependency>
         -->
-        <dependency>
-            <groupId>jta</groupId>
-            <artifactId>jta</artifactId>
-            <version>1.0.1b</version>
-        </dependency>
 
         <dependency>
             <groupId>javax.servlet</groupId>
@@ -251,7 +240,7 @@
         </plugins>
     </build>
     <properties>
-        <jira.version>7.12.0</jira.version>
+        <jira.version>7.12.3</jira.version>
         <amps.version>6.3.21</amps.version>
         <plugin.testrunner.version>1.2.3</plugin.testrunner.version>
         <atlassian.spring.scanner.version>1.2.13</atlassian.spring.scanner.version>
