@@ -122,7 +122,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
-
         if (shouldSkip(request)) {
             chain.doFilter(req, res);
             return;
@@ -182,6 +181,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
             @Override
             public void logoutHttpSessions(List<String> ids) {
+
                 log.warn("landed in logoutHttpSessions method");
                 log.debug("**************** logoutHttpSessions");
                 //System.err.println("**************** logoutHttpSessions");
@@ -226,6 +226,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             return;
         }
         response.sendError(403);
+
     }
 
     /**
@@ -240,6 +241,11 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      */
     private boolean shouldSkip(HttpServletRequest request) {
 
+        String uri = request.getRequestURI();
+        if (uri.contains("/rest/") || uri.endsWith("/rest")) {
+            log.warn("skipping request " + uri);
+            return true;
+        }
         if (skipPattern == null) {
             log.debug("Didnt skip the request " + request.getRequestURI());
             return false;
