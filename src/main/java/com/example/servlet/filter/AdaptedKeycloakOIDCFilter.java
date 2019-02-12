@@ -239,11 +239,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * {@code false} otherwise.
      */
     private boolean shouldSkip(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        if (uri.contains("/rest/") || uri.endsWith("/rest")) {
-            log.info("skipping request " + uri);
-            return true;
-        }
+
         if (skipPattern == null) {
             log.debug("Didnt skip the request " + request.getRequestURI());
             return false;
