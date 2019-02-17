@@ -3,7 +3,6 @@
   "auth-server-url": "http://localhost:8180/auth",
   "ssl-required": "external",
   "resource": "jira",
-  "public-client": true,
   "credentials": {
     "secret": "07ef1aa7-3221-44c9-bc7a-b875579502e3"
   },

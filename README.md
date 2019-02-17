@@ -5,7 +5,12 @@ You may configure keycloak by editing the keycloak.json file according to the do
 This was originally developed with Keycloak 4.8.3.Final and Jira 7.12.
 Please do notice that this is not necessarily the most efficient way possible to authenticate to Jira with [Keycloak](https://www.keycloak.org/). 
 Also if you are looking for actual support please investigate the marketplace for your needs. There should be way better options available to you than using this plugin
-
+#Disclaimer
+This plugin currently does not support single log-out. If users do logout from Jira,
+they are not logged out from Keycloak. This shows if you just press "login again" after logging out.
+You will see the login form, but the user task bar will also appear. This signals that Jira
+found a user to show the taskbar for.
+Also all your Jira users *MUST* be known to Keycloak for this plugin to work properly.
 #Getting this plugin running
 1. Make sure keycloak is running on localhost:8180. You can get that done via docker or just by downloading and unziping the official [distribution](https://www.keycloak.org/downloads.html)
 2. Create a user admin, so you can test immediately

@@ -3,8 +3,8 @@ package com.example.servlet.filter;
  * Adapted from https://github.com/keycloak/keycloak/blob/master/adapters/oidc/servlet-filter/src/main/java/org/keycloak/adapters/servlet/KeycloakOIDCFilter.java
  * I changed the logger and added further debugging messages relevant to me
  * I also edited the standard location of the keycloak file
- * Furthermore i added functionality to also add a jira login to the httpsession
- * I needed to copy some methods over in a one-to-one session since they were private in the superclass
+ * Furthermore I added functionality to add a Jira user to the httpSession if he already authenticated to Keycloak
+ * I needed to copy some methods over in a one-to-one manner since they were private in the superclass
  * Below you will find the original copyright statement
  * Many thanks to the awesome Red Hat developers writing Keycloak, the servlet adapter and putting it all under Apache 2.0!
  */
@@ -95,7 +95,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         String path = "/keycloak.json";
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         if (pathParam != null) path = pathParam;
-        log.warn("searching for config at path " + path);
+        log.info("searching for config at path " + path);
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
 
         KeycloakDeployment kd = this.createKeycloakDeploymentFrom(is);
@@ -128,6 +128,16 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         }
 
         HttpSession session = request.getSession();
+        //user logged out, so show him the logoutpage of jira, even though we did not destroy the sso session at the KC server
+        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
+            if (request.getRequestURI().endsWith("login.jsp")) {
+                log.warn("user wants to login again");
+            } else {
+                log.warn("user wanted a logout, keycloak is ignoring this request");
+                chain.doFilter(req, res);
+                return;
+            }
+        }
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
         if (principal != null) {
 
@@ -136,30 +146,31 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             return;
         }
 
-        //Check for missing authentication
-        if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY) == null) {
-            RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
-                    KeycloakSecurityContext.class.getName());
+        // Check for missing authentication is unnecessary, we only end up here,
+        // if the logged_in_key is missing
 
-            if (account != null) {
-                log.info("Found a valid KC user, attempting login to jira");
-                User user = getCrowdService().getUser(account.getToken().getPreferredUsername());
-                if (user == null) {
-                    log.debug("Login failed. User is in keycloak, but not in jira.");
-                    chain.doFilter(req, res);
-                    return;
-                } else {
-                    Object object = session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
-                    if (object != null) {
-                        session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
-                    }
-                    session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
-                    log.debug("Successfully authenticated user " + user.getDisplayName() + " to Jira");
-                    chain.doFilter(req, res);
-                    return;
+        RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
+                KeycloakSecurityContext.class.getName());
+
+        if (account != null) {
+            log.info("Found a valid KC user, attempting login to jira");
+            User user = getCrowdService().getUser(account.getToken().getPreferredUsername());
+            if (user == null) {
+                log.debug("Login failed. User is in keycloak, but not in jira.");
+                chain.doFilter(req, res);
+                return;
+            } else {
+                Object object = session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
+                if (object != null) {
+                    session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
                 }
+                session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
+                log.debug("Successfully authenticated user " + user.getDisplayName() + " to Jira");
+                chain.doFilter(req, res);
+                return;
             }
         }
+
 
         OIDCServletHttpFacade facade = new OIDCServletHttpFacade(request, response);
         KeycloakDeployment deployment = deploymentContext.resolveDeployment(facade);
@@ -173,7 +184,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             @Override
             public void logoutAll() {
                 //Using session might be nice but dunno at which time it might be called
-                log.warn("landed in logoutAll method");
+                log.debug("landed in logoutAll method");
                 if (idMapper != null) {
                     idMapper.clear();
                 }
@@ -183,8 +194,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             public void logoutHttpSessions(List<String> ids) {
 
                 log.warn("landed in logoutHttpSessions method");
-                log.debug("**************** logoutHttpSessions");
-                //System.err.println("**************** logoutHttpSessions");
                 for (String id : ids) {
                     log.debug("removed idMapper: " + id);
                     idMapper.removeSession(id);
@@ -194,7 +203,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         }, deploymentContext, facade);
 
         if (preActions.handleRequest()) {
-            //System.err.println("**************** preActions.handleRequest happened!");
             return;
         }
 
@@ -241,9 +249,9 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      */
     private boolean shouldSkip(HttpServletRequest request) {
 
-        String uri = request.getRequestURI();
-        if (uri.contains("/rest/") || uri.endsWith("/rest")) {
-            log.warn("skipping request " + uri);
+        String path = request.getServletPath();
+        if (path.contains("/rest/") || path.endsWith("/rest")) {
+            log.debug("skipping request " + path);
             return true;
         }
         if (skipPattern == null) {
@@ -252,7 +260,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         }
 
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        log.warn("Possibly skipping the request with path " + requestPath);
+        log.debug("Possibly skipping the request with path " + requestPath);
         return skipPattern.matcher(requestPath).matches();
     }
 
