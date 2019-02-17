@@ -4,7 +4,7 @@
   "ssl-required": "external",
   "resource": "jira",
   "credentials": {
-    "secret": "07ef1aa7-3221-44c9-bc7a-b875579502e3"
+    "secret": "c2934000-1467-43ab-af99-b4fb869adeae"
   },
   "confidential-port": 0,
   "principal-attribute": "preferred_username"

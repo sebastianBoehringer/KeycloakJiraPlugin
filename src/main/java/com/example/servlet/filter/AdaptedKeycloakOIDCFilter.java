@@ -126,14 +126,15 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             chain.doFilter(req, res);
             return;
         }
-
+        boolean secondLogin = false;
         HttpSession session = request.getSession();
         //user logged out, so show him the logoutpage of jira, even though we did not destroy the sso session at the KC server
         if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
             if (request.getRequestURI().endsWith("login.jsp")) {
-                log.warn("user wants to login again");
+                log.debug("user wants to login again");
+                secondLogin = true;
             } else {
-                log.warn("user wanted a logout, keycloak is ignoring this request");
+                log.debug("user wanted a logout, keycloak is ignoring this request");
                 chain.doFilter(req, res);
                 return;
             }
@@ -166,6 +167,11 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 }
                 session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
                 log.debug("Successfully authenticated user " + user.getDisplayName() + " to Jira");
+                if (secondLogin) {
+                    log.debug("user is authenticated from before, redirecting to start page");
+                    response.sendRedirect("http://localhost:2990/jira");
+                    return;
+                }
                 chain.doFilter(req, res);
                 return;
             }
