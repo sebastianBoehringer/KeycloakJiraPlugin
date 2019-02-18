@@ -30,6 +30,10 @@ import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
 import com.atlassian.jira.component.ComponentAccessor;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
@@ -45,6 +49,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
@@ -126,15 +131,32 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             chain.doFilter(req, res);
             return;
         }
+
         boolean secondLogin = false;
         HttpSession session = request.getSession();
+        RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
+                KeycloakSecurityContext.class.getName());
         //user logged out, so show him the logoutpage of jira, even though we did not destroy the sso session at the KC server
         if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
+            log.warn("attempting to logout user");
+            if (account != null) {
+                HttpGet httpGet = new HttpGet();
+                httpGet.setURI(UriBuilder.fromUri("http://localhost:8180/auth/realms/DevRealm/protocol/openid-connect/logout?id_token_hint=" + account.getIdTokenString()).build());
+                log.warn("trying get with " + httpGet.getURI());
+                try {
+                    HttpClient client = new DefaultHttpClient();
+                    HttpResponse httpResponse = client.execute(httpGet);
+                    log.warn(httpResponse.getStatusLine().toString());
+                } catch (Exception e) {
+                    log.warn("Caught exception " + e);
+                }
+            }
             if (request.getRequestURI().endsWith("login.jsp")) {
                 log.debug("user wants to login again");
                 secondLogin = true;
             } else {
-                log.debug("user wanted a logout, keycloak is ignoring this request");
+                log.warn("user wanted a logout, keycloak is ignoring this request");
+
                 chain.doFilter(req, res);
                 return;
             }
@@ -150,8 +172,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         // Check for missing authentication is unnecessary, we only end up here,
         // if the logged_in_key is missing
 
-        RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
-                KeycloakSecurityContext.class.getName());
 
         if (account != null) {
             log.info("Found a valid KC user, attempting login to jira");
@@ -190,7 +210,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             @Override
             public void logoutAll() {
                 //Using session might be nice but dunno at which time it might be called
-                log.debug("landed in logoutAll method");
+                log.warn("landed in logoutAll method");
                 if (idMapper != null) {
                     idMapper.clear();
                 }
@@ -270,7 +290,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         return skipPattern.matcher(requestPath).matches();
     }
 
-    //Jira uses crowd for its usermanagement
+    //Jira uses embedded crowd for its usermanagement
     private CrowdService getCrowdService() {
 
         return ComponentAccessor.getCrowdService();
