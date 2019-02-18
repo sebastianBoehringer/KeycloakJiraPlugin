@@ -138,15 +138,15 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 KeycloakSecurityContext.class.getName());
         //user logged out, so show him the logoutpage of jira, even though we did not destroy the sso session at the KC server
         if (session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
-            log.warn("attempting to logout user");
+            log.info("attempting to logout user");
             if (account != null) {
                 HttpGet httpGet = new HttpGet();
                 httpGet.setURI(UriBuilder.fromUri("http://localhost:8180/auth/realms/DevRealm/protocol/openid-connect/logout?id_token_hint=" + account.getIdTokenString()).build());
-                log.warn("trying get with " + httpGet.getURI());
+                log.debug("trying get with " + httpGet.getURI());
                 try {
                     HttpClient client = new DefaultHttpClient();
                     HttpResponse httpResponse = client.execute(httpGet);
-                    log.warn(httpResponse.getStatusLine().toString());
+                    log.info(httpResponse.getStatusLine().toString());
                 } catch (Exception e) {
                     log.warn("Caught exception " + e);
                 }
@@ -155,7 +155,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 log.debug("user wants to login again");
                 secondLogin = true;
             } else {
-                log.warn("user wanted a logout, keycloak is ignoring this request");
+                log.info("user wanted a logout, keycloak is ignoring this request");
 
                 chain.doFilter(req, res);
                 return;
