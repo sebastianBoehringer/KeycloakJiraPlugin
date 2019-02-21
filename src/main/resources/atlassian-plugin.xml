@@ -13,8 +13,6 @@
   <!-- add our web resources -->
   <web-resource key="myFirstPlugin-resources" name="myFirstPlugin Web Resources">
     <dependency>com.atlassian.auiplugin:ajs</dependency>
-    <resource type="download" name="myFirstPlugin.css" location="/css/myFirstPlugin.css"/>
-    <resource type="download" name="myFirstPlugin.js" location="/js/myFirstPlugin.js"/>
     <resource type="download" name="images/" location="/images"/>
     <context>myFirstPlugin</context>
   </web-resource>
