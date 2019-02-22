@@ -313,7 +313,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         String path = request.getServletPath();
         //custom check + logging
-        if (/*path.endsWith("login.jsp") ||*/ request.getQueryString().contains("noSSO")) {
+        if (/*path.endsWith("login.jsp") ||*/ (request.getQueryString() != null && request.getQueryString().contains("noSSO"))) {
             log.info("keycloak is ignoring this certain page to allow external users to log in");
             return true;
         }
