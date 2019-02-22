@@ -1,9 +1,9 @@
-package com.example.impl;
+package com.schmalz.impl;
 
 import com.atlassian.plugin.spring.scanner.annotation.export.ExportAsService;
 import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.sal.api.ApplicationProperties;
-import com.example.api.MyPluginComponent;
+import com.schmalz.api.MyPluginComponent;
 
 import javax.inject.Inject;
 import javax.inject.Named;

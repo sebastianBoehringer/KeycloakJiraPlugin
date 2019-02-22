@@ -1,4 +1,4 @@
-package com.example.servlet.filter;
+package com.schmalz.servlet.filter;
 /*
  * Adapted from https://github.com/keycloak/keycloak/blob/master/adapters/oidc/servlet-filter/src/main/java/org/keycloak/adapters/servlet/KeycloakOIDCFilter.java
  * I changed the logger and added further debugging messages relevant to me
@@ -68,6 +68,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private String realm;
 
     private final KeycloakConfigResolver definedconfigResolver;
+    /* unchanged code */
 
     /**
      * Constructor that can be used to define a {@code KeycloakConfigResolver} that will be used at initialization to
@@ -85,6 +86,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         this(null);
     }
 
+    /* end of unchanged code */
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
 
@@ -127,21 +129,23 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             chain.doFilter(req, res);
             return;
         }
-        /** custom code **/
+        /* custom code */
         HttpSession session = request.getSession();
 
         RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
                 KeycloakSecurityContext.class.getName());
 
         if (request.getServletPath().contains("Logout")) {
-            handleLogout(account, session);
+            if (handleLogout(account, session))
+                log.debug("logout succesful");
+            else
+                log.debug("logout failed");
             chain.doFilter(req, res);
             return;
         }
 
         Principal principal = (Principal) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
         if (principal != null) {
-            RefreshableKeycloakSecurityContext context = (RefreshableKeycloakSecurityContext) session.getAttribute(KeycloakSecurityContext.class.getName());
 
             log.debug("found jira user " + principal.getName() + ", resuming filter chain");
             chain.doFilter(req, res);
@@ -154,13 +158,16 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         if (account != null) {
             log.debug("user is authenticated by keycloak, attempting login");
-            handleLogin(account.getToken().getPreferredUsername(), session);
+            if (handleLogin(account.getToken().getPreferredUsername(), session))
+                log.debug("login successful");
+            else
+                log.debug("login failed");
             chain.doFilter(req, res);
             return;
         }
 
-        /** end of custom code**/
-        /*******************************Nearly unchanged Code from Keycloak**************************************************/
+        /* end of custom code */
+        /* Nearly unchanged Code from Keycloak */
         OIDCServletHttpFacade facade = new OIDCServletHttpFacade(request, response);
         KeycloakDeployment deployment = deploymentContext.resolveDeployment(facade);
         if (deployment == null || !deployment.isConfigured()) {
@@ -172,7 +179,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         PreAuthActionsHandler preActions = new PreAuthActionsHandler(new UserSessionManagement() {
             @Override
             public void logoutAll() {
-                /***only change ***/
+                /* only change  */
                 User toLogOut = (User) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
                 Enumeration<String> enumeration = session.getAttributeNames();
                 /*log.warn("start of enum");
@@ -184,7 +191,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                     session.removeAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY, Boolean.TRUE);
                 }
-                /***end of change***/
+                /* end of change */
                 log.debug("landed in logoutAll method");
                 if (idMapper != null) {
                     idMapper.clear();
@@ -194,7 +201,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             @Override
             public void logoutHttpSessions(List<String> ids) {
 
-                /***only change ***/
+                /* only change */
                 User toLogOut = (User) session.getAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
                 log.warn("landed in logoutHttpSessions");
                 Enumeration<String> enumeration = session.getAttributeNames();
@@ -207,7 +214,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                     session.removeAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY);
                     session.setAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY, Boolean.TRUE);
                 }
-                /***end of change***/
+                /* end of change */
                 for (String id : ids) {
                     log.debug("removed idMapper: " + id);
                     idMapper.removeSession(id);
@@ -248,10 +255,10 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             return;
         }
         response.sendError(403);
-        /********************************end of nearly unchanged code*************************/
+        /* end of nearly unchanged code */
     }
 
-    private void handleLogout(KeycloakSecurityContext account, HttpSession session) {
+    private boolean handleLogout(KeycloakSecurityContext account, HttpSession session) {
         session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
         if (account != null) {
             log.info("attempting to logout user " + account.getIdToken().getPreferredUsername());
@@ -264,11 +271,12 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 HttpClient client = new DefaultHttpClient();
                 HttpResponse httpResponse = client.execute(httpGet);
                 log.debug(httpResponse.getStatusLine().toString());
-
+                return true;
             } catch (Exception ex) {
                 log.warn("Caught exception " + ex);
             }
         }
+        return false;
     }
 
     private boolean handleLogin(String userName, HttpSession session) {
@@ -305,11 +313,11 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         String path = request.getServletPath();
         //custom check + logging
-        if (path.endsWith("login.jsp")) {
+        if (/*path.endsWith("login.jsp") ||*/ request.getQueryString().contains("noSSO")) {
             log.info("keycloak is ignoring this certain page to allow external users to log in");
             return true;
         }
-        if (path.contains("/rest/") || path.endsWith("/rest")) {
+        if (path.contains("/rest")) {
             log.debug("skipping request " + path);
             return true;
         }
@@ -325,7 +333,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     //Jira uses embedded crowd for its usermanagement
     private CrowdService getCrowdService() {
-
         return ComponentAccessor.getCrowdService();
     }
 }

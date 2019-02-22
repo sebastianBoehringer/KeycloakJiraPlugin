@@ -1,4 +1,4 @@
-package com.example.api;
+package com.schmalz.api;
 
 public interface MyPluginComponent
 {

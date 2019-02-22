@@ -18,7 +18,7 @@
   </web-resource>
 
   <servlet-filter name="Oidc Filter" i18n-name-key="oidc-filter.name" key="oidc-filter"
-                  class="com.example.servlet.filter.AdaptedKeycloakOIDCFilter" location="before-login" weight="100">
+                  class="com.schmalz.servlet.filter.AdaptedKeycloakOIDCFilter" location="before-login" weight="100">
     <description key="oidc-filter.description">The OpenId-Connect filter that is responsible for authentication against Keycloak</description>
     <url-pattern>/*</url-pattern>
     <resource type="download" name="keycloak.json" location="./keycloak.json"/>

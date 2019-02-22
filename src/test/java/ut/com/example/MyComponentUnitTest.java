@@ -1,8 +1,8 @@
 package ut.com.example;
 
+import com.schmalz.api.MyPluginComponent;
+import com.schmalz.impl.MyPluginComponentImpl;
 import org.junit.Test;
-import com.example.api.MyPluginComponent;
-import com.example.impl.MyPluginComponentImpl;
 
 import static org.junit.Assert.assertEquals;
 
