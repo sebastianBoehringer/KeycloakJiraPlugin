@@ -22,5 +22,11 @@
     <description key="oidc-filter.description">The OpenId-Connect filter that is responsible for authentication against Keycloak</description>
     <url-pattern>/*</url-pattern>
     <resource type="download" name="keycloak.json" location="./keycloak.json"/>
+    <init-param>
+      <param-name>keycloak.config.path</param-name>
+      <param-value>/keycloak.json</param-value>
+      <param-name>plugin.debug</param-name>
+      <param-value>false</param-value>
+    </init-param>
   </servlet-filter>
 </atlassian-plugin>

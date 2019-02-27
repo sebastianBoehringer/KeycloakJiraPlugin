@@ -3,17 +3,20 @@
 This plugin was created with the Atlassian SDK. See, for example, [the official introduction](https://developer.atlassian.com/display/DOCS/Introduction+to+the+Atlassian+Plugin+SDK).
 To run it, go to the root directory and enter 'atlas-run' in your favorite command shell.
 You may configure keycloak by editing the keycloak.json file according to the documentation [here](https://www.keycloak.org/docs/latest/securing_apps/index.html#java-adapters).
-This was originally developed with Keycloak 4.8.3.Final and Jira 7.12.
+This was originally developed with Keycloak 4.8.3.Final and Jira 7.13.
 Please do notice that this is not necessarily the most efficient way possible to authenticate to Jira with [Keycloak](https://www.keycloak.org/). 
 Also if you are looking for actual support please investigate the marketplace for your needs. There should be way better options available to you than using this plugin
 
 #Disclaimer
 This plugin currently does not support single log-out. If users logout from JIRA they are logged out from Keycloak.
-The reverse does not apply. e.g if a user loggs out from CONFLUENCE and CONFLUENCE is also configured as a Keycloak client
+The reverse does not apply. e.g if a user logs out from CONFLUENCE and CONFLUENCE is also configured as a Keycloak client
 the JIRA-session will not be ended.
 All your Jira users *MUST* be known to Keycloak for this plugin to work properly.
 Alternatively users may login the "old school" way by appending a query parameter "noSSO" to the URL when 
 accessing JIRA for the first time
+
+This plugin was only tested with Jira running on localhost, though the keycloakserver was on a different
+machine.
 
 #Getting this plugin running
 1. Make sure keycloak is running on localhost:8180. You can get that done via docker or just by downloading and unziping the official [distribution](https://www.keycloak.org/downloads.html)

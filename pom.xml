@@ -146,6 +146,7 @@
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
             <version>4.3.6</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -227,7 +228,7 @@
         </plugins>
     </build>
     <properties>
-        <jira.version>7.12.3</jira.version>
+        <jira.version>7.13.1</jira.version>
         <amps.version>6.3.21</amps.version>
         <plugin.testrunner.version>1.2.3</plugin.testrunner.version>
         <atlassian.spring.scanner.version>1.2.13</atlassian.spring.scanner.version>
