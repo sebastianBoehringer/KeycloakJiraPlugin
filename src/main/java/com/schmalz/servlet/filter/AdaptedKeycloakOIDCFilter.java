@@ -163,7 +163,9 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * @return TRUE if the logout was successfully propagated to the AuthServer, FALSE otherwise
      */
     private boolean handleLogout(KeycloakSecurityContext account, HttpSession session) {
-        logSessionAttributes(session);
+        if (debugeMode) {
+            logSessionAttributes(session);
+        }
         session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
 
         /* null checks are not necessary, but provide for better logging */
