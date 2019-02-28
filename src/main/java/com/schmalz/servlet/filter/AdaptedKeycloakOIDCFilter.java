@@ -27,17 +27,17 @@ package com.schmalz.servlet.filter;
 
 import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
-import com.atlassian.jira.component.ComponentAccessor;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
+import com.atlassian.plugin.spring.scanner.annotation.component.Scanned;
+import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
+import com.atlassian.sal.api.pluginsettings.PluginSettings;
+import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.keycloak.KeycloakSecurityContext;
-import org.keycloak.adapters.KeycloakConfigResolver;
-import org.keycloak.adapters.KeycloakDeployment;
-import org.keycloak.adapters.KeycloakDeploymentBuilder;
-import org.keycloak.adapters.RefreshableKeycloakSecurityContext;
+import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.KeycloakOIDCFilter;
 import org.keycloak.adapters.spi.KeycloakAccount;
 import org.slf4j.Logger;
@@ -45,24 +45,28 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
 import java.util.Enumeration;
+import java.util.HashMap;
 
-
+@Scanned
 public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
-
+    public static final String SETTINGS_KEY = AdaptedKeycloakOIDCFilter.class.getName() + "-keycloakJiraPlugin-SettingsKey";
     private final Logger log = LoggerFactory.getLogger(this.getClass());
-
     private String authServer;
     private String realm;
     private boolean disabled = false;
     private boolean debugeMode = false;
-    /* unchanged code */
-
+    @ComponentImport
+    private final CrowdService crowdService;
+    @ComponentImport
+    private final PluginSettingsFactory pluginSettingsFactory;
+    private KeycloakDeployment deployment;
 
     /**
      * Constructor that can be used to define a {@code KeycloakConfigResolver} that will be used at initialization to
@@ -70,20 +74,24 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      *
      * @param definedconfigResolver the resolver
      */
-    public AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver) {
+
+    private AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver, PluginSettingsFactory factory, CrowdService crowdService) {
 
         super(definedconfigResolver);
+        pluginSettingsFactory = factory;
+        this.crowdService = crowdService;
     }
 
-    public AdaptedKeycloakOIDCFilter() {
+    public AdaptedKeycloakOIDCFilter(PluginSettingsFactory factory, CrowdService crowdService) {
 
-        this(null);
+        this(null, factory, crowdService);
     }
 
-    /* end of unchanged code */
+
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
         super.init(filterConfig);
+
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         String path = pathParam == null ? "/keycloak.json" : pathParam;
         log.info("searching for config at path " + path);
@@ -93,9 +101,24 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
         if (is != null) {
-            KeycloakDeployment kd = KeycloakDeploymentBuilder.build(is);
-            realm = kd.getRealm();
-            authServer = kd.getAuthServerBaseUrl();
+            /*
+            plugin settings can only store: String, List<String>, Map<String,String>; thread below describes other possibilities
+            */
+            //https://community.atlassian.com/t5/Answers-Developer-Questions/PluginSettings-vs-Active-Objects/qaq-p/485817
+            if (deployment == null)
+                deployment = KeycloakDeploymentBuilder.build(is);
+            realm = deployment.getRealm();
+            authServer = deployment.getAuthServerBaseUrl();
+            this.deploymentContext = new AdapterDeploymentContext(deployment);
+            HashMap<String, String> toStore = new HashMap<>();
+            toStore.put("realm", realm);
+            toStore.put("authServer", authServer);
+            toStore.put("resource", deployment.getResourceName());
+            if (pluginSettingsFactory != null) {
+                PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
+                settings.put(SETTINGS_KEY, toStore);
+            }
+
         } else {
             log.error("could not find configuration file, this plugin will disable itself");
             disabled = true;
@@ -106,6 +129,11 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) req;
 
+        if (Boolean.parseBoolean((String) pluginSettingsFactory.createGlobalSettings().get("somerandomthing"))) {
+            HttpServletResponse response = (HttpServletResponse) res;
+            response.sendRedirect("https://www.schmalz.com");
+            return;
+        }
         if (shouldSkip(request) || disabled) {
             chain.doFilter(req, res);
             return;
@@ -122,10 +150,19 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         //logged_out_key is set by jira when logging out. handleLogout propagates the logout to keycloak
         if (request.getServletPath().contains("Logout") || session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
-            if (handleLogout(account, session))
+            if (handleLogout(account, session)) {
                 log.debug("logout successful");
-            else
+               /*
+                String redirectURI = request.getRequestURL().toString().replace("/Logout!default.jspa","").replace("Logout.jspa","");
+                log.error("tried replacing");
+                redirectURI = URLEncoder.encode(redirectURI, StandardCharsets.UTF_8.name());
+                log.warn("redirecturi is "+redirectURI);
+                response.sendRedirect(authServer+"/realms/"+realm+"/protocol/openid-connect/auth?response_type=code&" +
+                        "client_id="+clientId+"&redirect_uri="+redirectURI+"&login=true&scope=openid");
+                        */
+            } else {
                 log.debug("logout failed");
+            }
             chain.doFilter(req, res);
             return;
         }
@@ -147,6 +184,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             log.debug("user is authenticated by keycloak, attempting login");
             if (handleLogin(account.getToken().getPreferredUsername(), session)) {
                 log.debug("login successful");
+
             } else {
                 log.debug("login failed");
             }
@@ -166,8 +204,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         if (debugeMode) {
             logSessionAttributes(session);
         }
-        session.removeAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY);
-
+        // https://docs.atlassian.com/software/jira/docs/api/7.2.2/com/atlassian/jira/web/action/user/Logout.html
         /* null checks are not necessary, but provide for better logging */
         if (session.getAttribute(KeycloakSecurityContext.class.getName()) != null) {
             log.debug("removed security context");
@@ -184,8 +221,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                     "/openid-connect/logout?id_token_hint=" + account.getIdTokenString()).build());
             log.debug("trying get with " + httpGet.getURI());
 
-            try {
-                HttpClient client = new DefaultHttpClient();
+            try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
+
                 HttpResponse httpResponse = client.execute(httpGet);
                 log.debug(httpResponse.getStatusLine().toString());
                 return true;
@@ -203,7 +240,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      */
     private boolean handleLogin(String userName, HttpSession session) {
         log.info("Found a valid KC user, attempting login to jira");
-        User user = getCrowdService().getUser(userName);
+        User user = crowdService.getUser(userName);
         if (user == null) {
             log.debug("Authentication unsuccessful, user does not exist in Jira");
             return false;
@@ -252,10 +289,4 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         log.warn("end of enum");
     }
 
-    /**
-     * @return the CrowdService Jira uses for its usermanagement
-     */
-    private CrowdService getCrowdService() {
-        return ComponentAccessor.getCrowdService();
-    }
 }

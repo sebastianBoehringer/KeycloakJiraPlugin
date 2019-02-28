@@ -1,0 +1,29 @@
+<html>
+<head>
+    <title>Configure your Keycloakdeployment</title>
+    <meta name="decorator" content="atl.general">
+</head>
+<body>
+<h1>success.vm</h1>
+<form method="get" action="$requestUrl">
+    <label>Keycloakresource</label>
+    <input type="text" value="$map.resource" required="required" name="resource">
+
+    <label>KeycloakbaseURL</label>
+    <input type="url" value="$map.authServer" required="required" name="baseUrl">
+
+    <label>Keycloakrealm</label>
+    <input type="text" value="$map.realm" required="required" name="realm">
+
+    <button type="submit">SUBMIT IT</button>
+</form>
+<p>
+    $map.resource is my resource <br>
+    $map.authServer is my BaseURL <br>
+    $map.realm is my realm <br>
+    $query is the queryparameter
+</p>
+</body>
+
+
+</html>

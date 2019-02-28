@@ -7,6 +7,7 @@
     <vendor name="${project.organization.name}" url="${project.organization.url}"/>
     <param name="plugin-icon">images/pluginIcon.png</param>
     <param name="plugin-logo">images/pluginLogo.png</param>
+    <param name="configure.url">/plugins/servlet/admin/keycloakJiraPlugin/configureAdapterDeployment</param>
   </plugin-info>
   <!-- add our i18n resource -->
   <resource type="i18n" name="i18n" location="myFirstPlugin"/>
@@ -16,7 +17,6 @@
     <resource type="download" name="images/" location="/images"/>
     <context>myFirstPlugin</context>
   </web-resource>
-
   <servlet-filter name="Oidc Filter" i18n-name-key="oidc-filter.name" key="oidc-filter"
                   class="com.schmalz.servlet.filter.AdaptedKeycloakOIDCFilter" location="before-login" weight="100">
     <description key="oidc-filter.description">The OpenId-Connect filter that is responsible for authentication against Keycloak</description>
@@ -27,6 +27,17 @@
       <param-value>/keycloak.json</param-value>
       <param-name>plugin.debug</param-name>
       <param-value>false</param-value>
+      <param-name>keycloak.config.skipPattern</param-name>
+      <param-value/>
     </init-param>
   </servlet-filter>
+
+  <servlet name="Keycloak Config Servlet" i18n-name-key="keycloak-config-servlet.name" key="keycloak-config-servlet"
+           class="com.schmalz.servlet.KeycloakConfigServlet">
+    <description key="keycloak-config-servlet.description">Displays a form to configure the adapter deployment
+    </description>
+    <url-pattern>/admin/keycloakJiraPlugin/configureAdapterDeployment</url-pattern>
+  </servlet>
+
+
 </atlassian-plugin>
