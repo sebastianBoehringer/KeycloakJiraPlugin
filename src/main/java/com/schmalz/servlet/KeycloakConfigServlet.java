@@ -100,6 +100,7 @@ public class KeycloakConfigServlet extends HttpServlet {
         String[] keyValuePairs = query.split("&");
         for (String keyValuePair : keyValuePairs) {
             String[] splitKeyValuePairs = keyValuePair.split("=");
+
             if (isValidValue(splitKeyValuePairs[0])) {
                 if (splitKeyValuePairs[0].contains("Url")) {
                     try {
