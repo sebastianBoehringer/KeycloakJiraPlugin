@@ -32,6 +32,7 @@ import com.atlassian.plugin.spring.scanner.annotation.component.Scanned;
 import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.sal.api.pluginsettings.PluginSettings;
 import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
+import com.schmalz.servlet.KeycloakConfigServlet;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -53,6 +54,7 @@ import java.io.InputStream;
 import java.security.Principal;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Map;
 
 @Scanned
 public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
@@ -60,6 +62,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
     private String authServer;
     private String realm;
+    private String resource;
     private boolean disabled = false;
     private boolean debugeMode = false;
     @ComponentImport
@@ -116,7 +119,12 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             toStore.put("resource", deployment.getResourceName());
             if (pluginSettingsFactory != null) {
                 PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-                settings.put(SETTINGS_KEY, toStore);
+                Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
+                if (possiblyDifferentSettings != null) {
+                    handleUpdate(possiblyDifferentSettings);
+                } else {
+                    settings.put(SETTINGS_KEY, toStore);
+                }
             }
 
         } else {
@@ -128,11 +136,12 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) req;
-
-        if (Boolean.parseBoolean((String) pluginSettingsFactory.createGlobalSettings().get("somerandomthing"))) {
+        PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
+        if (Boolean.parseBoolean((String) settings.get(KeycloakConfigServlet.UPDATED_SETTINGS_KEY))) {
+            handleUpdate(settings);
             HttpServletResponse response = (HttpServletResponse) res;
-            response.sendRedirect("https://www.schmalz.com");
-            return;
+            /*response.sendRedirect("https://www.schmalz.com");
+            return;*/
         }
         if (shouldSkip(request) || disabled) {
             chain.doFilter(req, res);
@@ -287,6 +296,20 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         while (enumeration.hasMoreElements())
             log.warn(enumeration.nextElement());
         log.warn("end of enum");
+    }
+
+    private void handleUpdate(PluginSettings settings) {
+        handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY));
+        settings.remove(KeycloakConfigServlet.UPDATED_SETTINGS_KEY);
+    }
+
+    private void handleUpdate(Map<String, String> config) {
+        resource = config.get("resource");
+        realm = config.get("realm");
+
+        deployment.setResourceName(resource);
+        deployment.setRealm("realm");
+        deploymentContext = new AdapterDeploymentContext(deployment);
     }
 
 }
