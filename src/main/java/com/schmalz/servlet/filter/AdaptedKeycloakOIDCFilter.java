@@ -41,6 +41,7 @@ import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.KeycloakOIDCFilter;
 import org.keycloak.adapters.spi.KeycloakAccount;
+import org.keycloak.representations.adapters.config.AdapterConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +70,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private final CrowdService crowdService;
     @ComponentImport
     private final PluginSettingsFactory pluginSettingsFactory;
-    private KeycloakDeployment deployment;
+
+    private FilterConfig filterConfiguration;
 
     /**
      * Constructor that can be used to define a {@code KeycloakConfigResolver} that will be used at initialization to
@@ -104,27 +106,29 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
         if (is != null) {
+            KeycloakDeployment deployment = KeycloakDeploymentBuilder.build(is);
             /*
             plugin settings can only store: String, List<String>, Map<String,String>; thread below describes other possibilities
             */
             //https://community.atlassian.com/t5/Answers-Developer-Questions/PluginSettings-vs-Active-Objects/qaq-p/485817
-            if (deployment == null)
-                deployment = KeycloakDeploymentBuilder.build(is);
             realm = deployment.getRealm();
             authServer = deployment.getAuthServerBaseUrl();
             this.deploymentContext = new AdapterDeploymentContext(deployment);
             HashMap<String, String> toStore = new HashMap<>();
-            toStore.put("realm", realm);
-            toStore.put("authServer", authServer);
-            toStore.put("resource", deployment.getResourceName());
+            toStore.put(KeycloakConfigServlet.REALM_KEY, realm);
+            toStore.put(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY, authServer);
+            toStore.put(KeycloakConfigServlet.RESOURCE_KEY, deployment.getResourceName());
             if (pluginSettingsFactory != null) {
                 PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
                 Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
                 if (possiblyDifferentSettings != null) {
+
                     handleUpdate(possiblyDifferentSettings);
+
                 } else {
                     settings.put(SETTINGS_KEY, toStore);
                 }
+
             }
 
         } else {
@@ -161,14 +165,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         if (request.getServletPath().contains("Logout") || session.getAttribute(JiraSeraphAuthenticator.LOGGED_OUT_KEY) != null) {
             if (handleLogout(account, session)) {
                 log.debug("logout successful");
-               /*
-                String redirectURI = request.getRequestURL().toString().replace("/Logout!default.jspa","").replace("Logout.jspa","");
-                log.error("tried replacing");
-                redirectURI = URLEncoder.encode(redirectURI, StandardCharsets.UTF_8.name());
-                log.warn("redirecturi is "+redirectURI);
-                response.sendRedirect(authServer+"/realms/"+realm+"/protocol/openid-connect/auth?response_type=code&" +
-                        "client_id="+clientId+"&redirect_uri="+redirectURI+"&login=true&scope=openid");
-                        */
+
             } else {
                 log.debug("logout failed");
             }
@@ -299,17 +296,31 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     }
 
     private void handleUpdate(PluginSettings settings) {
-        handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY));
+        try {
+            handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY));
+        } catch (Exception e) {
+            settings.put("myExceptionKEY", e.getClass().getName());
+        }
         settings.remove(KeycloakConfigServlet.UPDATED_SETTINGS_KEY);
     }
 
     private void handleUpdate(Map<String, String> config) {
-        resource = config.get("resource");
-        realm = config.get("realm");
 
-        deployment.setResourceName(resource);
-        deployment.setRealm("realm");
-        deploymentContext = new AdapterDeploymentContext(deployment);
+        try (InputStream is = filterConfiguration.getServletContext().getResourceAsStream("/keycloak.json")) {
+            realm = config.get(KeycloakConfigServlet.REALM_KEY) != null ? config.get(KeycloakConfigServlet.REALM_KEY) : realm;
+            authServer = config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) != null ? config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) : authServer;
+            resource = config.get(KeycloakConfigServlet.RESOURCE_KEY) != null ? config.get(KeycloakConfigServlet.RESOURCE_KEY) : resource;
+            AdapterConfig adapterConfig = KeycloakDeploymentBuilder.loadAdapterConfig(is);
+            adapterConfig.setAuthServerUrl(authServer);
+            adapterConfig.setRealm(config.get(realm));
+            adapterConfig.setResource(config.get(resource));
+            deploymentContext.updateDeployment(adapterConfig);
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+
+        }
+
+
     }
 
 }

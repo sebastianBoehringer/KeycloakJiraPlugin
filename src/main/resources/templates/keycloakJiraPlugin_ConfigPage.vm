@@ -4,17 +4,17 @@
     <meta name="decorator" content="atl.general">
 </head>
 <body>
-<h1>Here you can configure the plugin deployment</h1>
-Warning: The Authserverbaseurl cannot be changed currently <br/>
-Hello user $username !!
 <div align="center">
+    <h1>Here you can configure the plugin deployment</h1>
+    Hello user $username !! WE got some $stuff
+
     <form method="get" action="$requestUrl">
         <label>Keycloakresource</label>
         <input type="text" value="$map.resource" required="required" name="resource">
         <br/>
 
         <label>KeycloakbaseURL</label>
-        <input type="url" value="$map.authServer" required="required" name="baseUrl">
+        <input type="text" value="$map.authServerUrl" required="required" name="authServerUrl">
         <br/>
 
         <label>Keycloakrealm</label>

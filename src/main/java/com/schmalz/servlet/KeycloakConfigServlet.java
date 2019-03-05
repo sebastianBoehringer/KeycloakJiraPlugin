@@ -18,7 +18,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -31,10 +30,13 @@ import java.util.Map;
 @Scanned
 public class KeycloakConfigServlet extends HttpServlet {
     private static final Logger log = LoggerFactory.getLogger(KeycloakConfigServlet.class);
-
     public static final String UPDATED_SETTINGS_KEY = KeycloakConfigServlet.class.getName() + "-keycloakJiraPlugin-settingsUpdatedKey";
     private static List<String> validValues;
-    private final String CONFIG_TEMPLATE = "/templates/keycloakJiraPlugin_ConfigPage.vm";
+    public static final String REALM_KEY = "realm";
+    public static final String UNUSUED_KEY = "upforgrabz";
+    public static final String RESOURCE_KEY = "resource";
+    public static final String AUTH_SERVER_BASEURL_KEY = "authServerUrl";
+    private final static String CONFIG_TEMPLATE = "/templates/keycloakJiraPlugin_ConfigPage.vm";
 
     @ComponentImport
     private final LoginUriProvider loginUriProvider;
@@ -54,9 +56,9 @@ public class KeycloakConfigServlet extends HttpServlet {
         userManager = manager;
         this.loginUriProvider = loginUriProvider;
         validValues = new ArrayList<>();
-        validValues.add("resource");
-        validValues.add("baseUrl");
-        validValues.add("realm");
+        validValues.add(REALM_KEY);
+        validValues.add(AUTH_SERVER_BASEURL_KEY);
+        validValues.add(RESOURCE_KEY);
     }
 
     @Override
@@ -81,8 +83,11 @@ public class KeycloakConfigServlet extends HttpServlet {
         Map<String, String> kd = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Map<String, Object> context = new HashMap<>();
 
-
+        String stuff = (String) settings.get("myExceptionKEY");
+        stuff = stuff == null ? "no Exception" : stuff;
         context.put("map", kd);
+        settings.remove("myExceptionKEY");
+        context.put("stuff", stuff);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
         templateRenderer.render(CONFIG_TEMPLATE, context, response.getWriter());
@@ -94,7 +99,6 @@ public class KeycloakConfigServlet extends HttpServlet {
         if (query == null) {
             return false;
         }
-        InputStream is = getServletContext().getResourceAsStream("/keycloak.json");
 
         Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         String[] keyValuePairs = query.split("&");
