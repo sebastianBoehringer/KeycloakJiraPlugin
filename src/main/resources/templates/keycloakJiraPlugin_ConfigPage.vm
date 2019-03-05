@@ -8,7 +8,7 @@
     <h1>Here you can configure the plugin deployment</h1>
     Hello user $username !! WE got some $stuff
 
-    <form method="get" action="$requestUrl">
+    <form method="post" action="$requestUrl">
         <label>Keycloakresource</label>
         <input type="text" value="$map.resource" required="required" name="resource">
         <br/>
@@ -21,7 +21,16 @@
         <input type="text" value="$map.realm" required="required" name="realm">
         <br/>
 
-        <button type="submit">SUBMIT IT</button>
+        <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;" type="radio" name="type" checked="checked">
+        <input type="text" name="custom" id="custom" placeholder="should be 5 charecters at least" >
+        <br><br>
+        <input onclick="document.getElementById('custom').disabled = true; document.getElementById('charstype').disabled = false;" type="radio" name="type" value="customurl">random?
+        <select name="charstype" id="charstype" disabled="disabled">
+            <option>Letters</option>
+            <option>Number</option>
+        </select>
+
+        <button type="submit">Update Configuration</button>
     </form>
 </div>
 

@@ -8,8 +8,10 @@ import com.atlassian.sal.api.pluginsettings.PluginSettings;
 import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
 import com.atlassian.sal.api.user.UserManager;
 import com.atlassian.sal.api.user.UserProfile;
+import com.atlassian.sal.api.user.UserRole;
 import com.atlassian.templaterenderer.TemplateRenderer;
 import com.schmalz.servlet.filter.AdaptedKeycloakOIDCFilter;
+import org.keycloak.KeycloakSecurityContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,14 +20,10 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Scanned
 public class KeycloakConfigServlet extends HttpServlet {
@@ -75,18 +73,14 @@ public class KeycloakConfigServlet extends HttpServlet {
         }
 
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-        if (handleQueryString(request.getQueryString(), settings)) {
-            response.sendRedirect(request.getRequestURL().toString());
-            return;
-        }
+
 
         Map<String, String> kd = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Map<String, Object> context = new HashMap<>();
 
-        String stuff = (String) settings.get("myExceptionKEY");
-        stuff = stuff == null ? "no Exception" : stuff;
+        String stuff = (String) retrieveAndRemove(settings, "myAdapterConfigKey");
+        stuff = stuff == null ? "got some Exception" : stuff;
         context.put("map", kd);
-        settings.remove("myExceptionKEY");
         context.put("stuff", stuff);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
@@ -94,35 +88,30 @@ public class KeycloakConfigServlet extends HttpServlet {
         //https://developer.atlassian.com/server/jira/platform/creating-a-jira-issue-crud-servlet-and-issue-search/
     }
 
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
-    private boolean handleQueryString(String query, PluginSettings settings) {
-        if (query == null) {
-            return false;
-        }
-
+        PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
         Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
-        String[] keyValuePairs = query.split("&");
-        for (String keyValuePair : keyValuePairs) {
-            String[] splitKeyValuePairs = keyValuePair.split("=");
+        Enumeration<String> parameters = request.getParameterNames();
 
-            if (isValidValue(splitKeyValuePairs[0])) {
-                if (splitKeyValuePairs[0].contains("Url")) {
-                    try {
-                        splitKeyValuePairs[1] = URLDecoder.decode(splitKeyValuePairs[1], StandardCharsets.UTF_8.name());
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
-                }
-                config.put(splitKeyValuePairs[0], splitKeyValuePairs[1]);
-            }
+        while (parameters.hasMoreElements()) {
+            retrieveAndStore(request, parameters.nextElement(), config);
         }
-        settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY, config);
+        settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY,config);
         settings.put(UPDATED_SETTINGS_KEY, "True");
-        return true;
+        response.sendRedirect(request.getContextPath()+request.getServletPath());
+
     }
 
-    private boolean isValidValue(String toTest) {
-        return validValues.contains(toTest);
+
+    /**
+     * tests, whether a given parameter is a supported/valid configuration key
+     * @param param the param to test
+     * @return TRUE, if the param was a valid configuration key, false otherwise
+     */
+    private boolean isValidValue(String param) {
+        return validValues.contains(param);
     }
 
     /**
@@ -133,6 +122,13 @@ public class KeycloakConfigServlet extends HttpServlet {
         return userManager.isAdmin(profile.getUserKey()) || userManager.isSystemAdmin(profile.getUserKey());
     }
 
+    /**
+     * redirects a user to jira's login page if he was not logged in. wont be called if the user wants to use keycloak
+     * since the filter will act prior
+     * @param request the request with the missing user
+     * @param response the response to redirect
+     * @throws IOException if the redirect fails
+     */
     private void redirectToLogin(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.sendRedirect(loginUriProvider.getLoginUri(getUri(request)).toASCIIString());
     }
@@ -146,9 +142,46 @@ public class KeycloakConfigServlet extends HttpServlet {
         return URI.create(builder.toString());
     }
 
+
+    /**
+     * redirects the user, when it was determined that he does not have sufficient privileges. this differs, when a user
+     * is authenticated to keycloak or not
+     * @param request the given http-request
+     * @param response the response to redirect
+     * @throws IOException if the redirect cannot be send
+     */
     private void handleUnauthorizedAccess(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.sendRedirect("https://google.com");
-        //TODO do something useful here
+        if (request.getSession().getAttribute(KeycloakSecurityContext.class.getName()) == null) {
+            response.sendRedirect(loginUriProvider.getLoginUriForRole(getUri(request), UserRole.ADMIN).toASCIIString());
+        } else
+            response.sendRedirect(request.getContextPath());
+    }
+
+
+    /**
+     * Retrieves and removes the value of the given key from the settings
+     * @param settings the settings to search
+     * @param key the key whose value should be retrieved
+     * @return the value of the key, NULL if the key is missing
+     */
+    private Object retrieveAndRemove(PluginSettings settings, String key) {
+        Object returnObject = settings.get(key);
+        settings.remove(key);
+        return returnObject;
+    }
+
+
+    /**
+     * retrieves a given parameter of a request and puts its value into a map
+     * @param request the request holding the parameter
+     * @param parameterKey the parameter to retrieve
+     * @param storage the map where the parameter, value pair should be stored
+     */
+    private void retrieveAndStore(HttpServletRequest request, String parameterKey, Map<String, String> storage) {
+        if (isValidValue(parameterKey)) {
+            String temp = request.getParameter(parameterKey);
+            storage.put(parameterKey, temp);
+        }
     }
 }
 //https://community.atlassian.com/t5/Answers-Developer-Questions/Retrieving-Plug-in-settings-using-PluginSettingsFactory/qaq-p/483804

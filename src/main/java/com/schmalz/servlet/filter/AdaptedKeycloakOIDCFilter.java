@@ -27,11 +27,14 @@ package com.schmalz.servlet.filter;
 
 import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
+import com.atlassian.event.api.EventPublisher;
+import com.atlassian.jira.event.user.LoginEvent;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
 import com.atlassian.plugin.spring.scanner.annotation.component.Scanned;
 import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.sal.api.pluginsettings.PluginSettings;
 import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
+import com.atlassian.sal.api.user.UserManager;
 import com.schmalz.servlet.KeycloakConfigServlet;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -47,7 +50,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
@@ -66,8 +68,10 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private String resource;
     private boolean disabled = false;
     private boolean debugeMode = false;
+
     @ComponentImport
     private final CrowdService crowdService;
+
     @ComponentImport
     private final PluginSettingsFactory pluginSettingsFactory;
 
@@ -80,7 +84,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * @param definedconfigResolver the resolver
      */
 
-    private AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver, PluginSettingsFactory factory, CrowdService crowdService) {
+    private AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver,
+                                      PluginSettingsFactory factory, CrowdService crowdService) {
 
         super(definedconfigResolver);
         pluginSettingsFactory = factory;
@@ -96,7 +101,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
         super.init(filterConfig);
-
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         String path = pathParam == null ? "/keycloak.json" : pathParam;
         log.info("searching for config at path " + path);
@@ -104,6 +108,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         String debugParam = filterConfig.getInitParameter("plugin.debug");
         debugeMode = Boolean.parseBoolean(debugParam);
 
+        //saving filterconfig so i can easily access the json-file later
+        filterConfiguration = filterConfig;
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
         if (is != null) {
             KeycloakDeployment deployment = KeycloakDeploymentBuilder.build(is);
@@ -143,15 +149,13 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
         if (Boolean.parseBoolean((String) settings.get(KeycloakConfigServlet.UPDATED_SETTINGS_KEY))) {
             handleUpdate(settings);
-            HttpServletResponse response = (HttpServletResponse) res;
-            /*response.sendRedirect("https://www.schmalz.com");
-            return;*/
+
         }
+        log.warn("alter ich logge");
         if (shouldSkip(request) || disabled) {
             chain.doFilter(req, res);
             return;
         }
-
         HttpSession session = request.getSession();
         if (debugeMode) {
             logSessionAttributes(session);
@@ -247,6 +251,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private boolean handleLogin(String userName, HttpSession session) {
         log.info("Found a valid KC user, attempting login to jira");
         User user = crowdService.getUser(userName);
+
         if (user == null) {
             log.debug("Authentication unsuccessful, user does not exist in Jira");
             return false;
@@ -297,27 +302,34 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     private void handleUpdate(PluginSettings settings) {
         try {
-            handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY));
+            settings.put("myAdapterConfigKey",handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY)));
         } catch (Exception e) {
             settings.put("myExceptionKEY", e.getClass().getName());
         }
+
         settings.remove(KeycloakConfigServlet.UPDATED_SETTINGS_KEY);
     }
 
-    private void handleUpdate(Map<String, String> config) {
+    private String handleUpdate(Map<String, String> config) {
 
         try (InputStream is = filterConfiguration.getServletContext().getResourceAsStream("/keycloak.json")) {
             realm = config.get(KeycloakConfigServlet.REALM_KEY) != null ? config.get(KeycloakConfigServlet.REALM_KEY) : realm;
             authServer = config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) != null ? config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) : authServer;
             resource = config.get(KeycloakConfigServlet.RESOURCE_KEY) != null ? config.get(KeycloakConfigServlet.RESOURCE_KEY) : resource;
             AdapterConfig adapterConfig = KeycloakDeploymentBuilder.loadAdapterConfig(is);
+
+            /*order is important here */
+            adapterConfig.setRealm(realm);
             adapterConfig.setAuthServerUrl(authServer);
-            adapterConfig.setRealm(config.get(realm));
-            adapterConfig.setResource(config.get(resource));
-            deploymentContext.updateDeployment(adapterConfig);
+            adapterConfig.setResource(resource);
+
+            KeycloakDeployment ment = KeycloakDeploymentBuilder.build(adapterConfig);
+
+            deploymentContext = new AdapterDeploymentContext(ment);
+            return ment.getAuthServerBaseUrl();
         } catch (Exception e) {
             log.warn(e.getMessage());
-
+            return e.getMessage()+e.getClass().getName();
         }
 
 
