@@ -21,10 +21,17 @@
         <input type="text" value="$map.realm" required="required" name="realm">
         <br/>
 
-        <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;" type="radio" name="type" checked="checked">
-        <input type="text" name="custom" id="custom" placeholder="should be 5 charecters at least" >
+
+        <label>Public client</label>
+        <input type="checkbox" name="publicClient" #if($checkBox)checked="checked"#end>
+
+
+        <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;"
+               type="radio" name="type" checked="checked">
+        <input type="text" name="custom" id="custom" placeholder="should be 5 charecters at least">
         <br><br>
-        <input onclick="document.getElementById('custom').disabled = true; document.getElementById('charstype').disabled = false;" type="radio" name="type" value="customurl">random?
+        <input onclick="document.getElementById('custom').disabled = true; document.getElementById('charstype').disabled = false;"
+               type="radio" name="type" value="customurl">random?
         <select name="charstype" id="charstype" disabled="disabled">
             <option>Letters</option>
             <option>Number</option>
