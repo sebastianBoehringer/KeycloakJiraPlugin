@@ -6,7 +6,7 @@
 <body>
 <div align="center">
     <h1>Here you can configure the plugin deployment</h1>
-    Hello user $username !! WE got some $stuff
+    Hello user $username !!
 
     <form method="post" action="$requestUrl">
         <label>Keycloakresource</label>
@@ -21,10 +21,22 @@
         <input type="text" value="$map.realm" required="required" name="realm">
         <br/>
 
+        #set($falsch = "false")
+        #set($richtig = "true")
 
         <label>Public client</label>
-        <input type="checkbox" name="publicClient" #if($checkBox)checked="checked"#end>
+        <fieldset id="publicClient">
+            Ja <input type="radio" value="true" name="publicClient" id="publicClientTrue"
+                      onclick="document.getElementById('secret').disabled = true; document.getElementById('secret').required=false"
+                      #if ($map.publicClient == $richtig)checked="checked" #end>
+            Nein <input type="radio" value="false" name="publicClient" id="publicClientFalse"
+                        onclick="document.getElementById('secret').disabled = false; document.getElementById('secret').required=true"
+            #if ($map.publicClient == $falsch) checked="checked #end">
+        </fieldset>
 
+        <label> Client Secret</label>
+        <input type="text" name="secret" id="secret" value="$map.secret" #if ($map.publicClient == $richtig)
+               disabled="disabled" #{else} required="required"#end>
 
         <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;"
                type="radio" name="type" checked="checked">
@@ -41,14 +53,6 @@
     </form>
 </div>
 
-<!--
-<p>
-    $map.resource is my resource <br>
-    $map.authServer is my BaseURL <br>
-    $map.realm is my realm <br>
-    $requestUrl is the requestUrl
-</p>
--->
 </body>
 
 </html>

@@ -27,14 +27,11 @@ package com.schmalz.servlet.filter;
 
 import com.atlassian.crowd.embedded.api.CrowdService;
 import com.atlassian.crowd.embedded.api.User;
-import com.atlassian.event.api.EventPublisher;
-import com.atlassian.jira.event.user.LoginEvent;
 import com.atlassian.jira.security.login.JiraSeraphAuthenticator;
 import com.atlassian.plugin.spring.scanner.annotation.component.Scanned;
 import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.sal.api.pluginsettings.PluginSettings;
 import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
-import com.atlassian.sal.api.user.UserManager;
 import com.schmalz.servlet.KeycloakConfigServlet;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -100,6 +97,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
+
         super.init(filterConfig);
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         String path = pathParam == null ? "/keycloak.json" : pathParam;
@@ -120,20 +118,21 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             realm = deployment.getRealm();
             authServer = deployment.getAuthServerBaseUrl();
             this.deploymentContext = new AdapterDeploymentContext(deployment);
-            HashMap<String, String> toStore = new HashMap<>();
-            toStore.put(KeycloakConfigServlet.REALM_KEY, realm);
-            toStore.put(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY, authServer);
-            toStore.put(KeycloakConfigServlet.RESOURCE_KEY, deployment.getResourceName());
-            if (pluginSettingsFactory != null) {
-                PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-                Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
-                if (possiblyDifferentSettings != null) {
 
-                    handleUpdate(possiblyDifferentSettings);
+            PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
+            Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
+            if (possiblyDifferentSettings != null) {
 
-                } else {
-                    settings.put(SETTINGS_KEY, toStore);
-                }
+                handleUpdate(possiblyDifferentSettings);
+
+            } else {
+                HashMap<String, String> toStore = new HashMap<>();
+                toStore.put(KeycloakConfigServlet.REALM_KEY, realm);
+                toStore.put(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY, authServer);
+                toStore.put(KeycloakConfigServlet.RESOURCE_KEY, deployment.getResourceName());
+                toStore.put(KeycloakConfigServlet.PUBLIC_CLIENT_KEY, Boolean.toString(deployment.isPublicClient()));
+                settings.put(SETTINGS_KEY, toStore);
+
 
             }
 
@@ -145,17 +144,18 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
+
         HttpServletRequest request = (HttpServletRequest) req;
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
         if (Boolean.parseBoolean((String) settings.get(KeycloakConfigServlet.UPDATED_SETTINGS_KEY))) {
             handleUpdate(settings);
-
         }
-        log.warn("alter ich logge");
+
         if (shouldSkip(request) || disabled) {
             chain.doFilter(req, res);
             return;
         }
+
         HttpSession session = request.getSession();
         if (debugeMode) {
             logSessionAttributes(session);
@@ -211,6 +211,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * @return TRUE if the logout was successfully propagated to the AuthServer, FALSE otherwise
      */
     private boolean handleLogout(KeycloakSecurityContext account, HttpSession session) {
+
         if (debugeMode) {
             logSessionAttributes(session);
         }
@@ -249,6 +250,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * @return (@ code true) if the login was successful, (@code false) otherwise
      */
     private boolean handleLogin(String userName, HttpSession session) {
+
         log.info("Found a valid KC user, attempting login to jira");
         User user = crowdService.getUser(userName);
 
@@ -293,6 +295,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      * @param session the HttpSession whose attributes should be logged
      */
     private synchronized void logSessionAttributes(HttpSession session) {
+
         Enumeration<String> enumeration = session.getAttributeNames();
         log.warn("start of enum");
         while (enumeration.hasMoreElements())
@@ -301,35 +304,39 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     }
 
     private void handleUpdate(PluginSettings settings) {
-        try {
-            settings.put("myAdapterConfigKey",handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY)));
-        } catch (Exception e) {
-            settings.put("myExceptionKEY", e.getClass().getName());
-        }
+
+        handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY));
 
         settings.remove(KeycloakConfigServlet.UPDATED_SETTINGS_KEY);
     }
 
-    private String handleUpdate(Map<String, String> config) {
+    private void handleUpdate(Map<String, String> config) {
 
         try (InputStream is = filterConfiguration.getServletContext().getResourceAsStream("/keycloak.json")) {
             realm = config.get(KeycloakConfigServlet.REALM_KEY) != null ? config.get(KeycloakConfigServlet.REALM_KEY) : realm;
             authServer = config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) != null ? config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) : authServer;
             resource = config.get(KeycloakConfigServlet.RESOURCE_KEY) != null ? config.get(KeycloakConfigServlet.RESOURCE_KEY) : resource;
             AdapterConfig adapterConfig = KeycloakDeploymentBuilder.loadAdapterConfig(is);
+            String pC = config.get(KeycloakConfigServlet.PUBLIC_CLIENT_KEY);
+            Boolean publicClient = pC == null ? adapterConfig.isPublicClient() : Boolean.valueOf(pC);
+            String secret = config.get(KeycloakConfigServlet.SECRET_KEY);
+            Map<String, Object> credentials = adapterConfig.getCredentials();
+            credentials.put("secret", secret);
+
 
             /*order is important here */
             adapterConfig.setRealm(realm);
             adapterConfig.setAuthServerUrl(authServer);
             adapterConfig.setResource(resource);
+            log.warn("set everything that worked");
 
+            adapterConfig.setPublicClient(publicClient);
+            adapterConfig.setCredentials(credentials);
             KeycloakDeployment ment = KeycloakDeploymentBuilder.build(adapterConfig);
 
             deploymentContext = new AdapterDeploymentContext(ment);
-            return ment.getAuthServerBaseUrl();
         } catch (Exception e) {
             log.warn(e.getMessage());
-            return e.getMessage()+e.getClass().getName();
         }
 
 

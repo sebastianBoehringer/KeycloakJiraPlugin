@@ -15,7 +15,8 @@
   <web-resource key="myFirstPlugin-resources" name="myFirstPlugin Web Resources">
     <dependency>com.atlassian.auiplugin:ajs</dependency>
     <resource type="download" name="images/" location="/images"/>
-    <context>myFirstPlugin</context>
+    <resource type="download" location="keycloak.json" name="keycloak.json"/>
+    <context>KeycloakJiraPlugin</context>
   </web-resource>
   <servlet-filter name="Oidc Filter" i18n-name-key="oidc-filter.name" key="oidc-filter"
                   class="com.schmalz.servlet.filter.AdaptedKeycloakOIDCFilter" location="before-login" weight="100">

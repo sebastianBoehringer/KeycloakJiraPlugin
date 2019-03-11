@@ -31,9 +31,10 @@ public class KeycloakConfigServlet extends HttpServlet {
     public static final String UPDATED_SETTINGS_KEY = KeycloakConfigServlet.class.getName() + "-keycloakJiraPlugin-settingsUpdatedKey";
     private static List<String> validValues;
     public static final String REALM_KEY = "realm";
-    public static final String UNUSUED_KEY = "upforgrabz";
+    public static final String PUBLIC_CLIENT_KEY = "publicClient";
     public static final String RESOURCE_KEY = "resource";
     public static final String AUTH_SERVER_BASEURL_KEY = "authServerUrl";
+    public static final String SECRET_KEY = "secret";
     private final static String CONFIG_TEMPLATE = "/templates/keycloakJiraPlugin_ConfigPage.vm";
 
     @ComponentImport
@@ -49,6 +50,7 @@ public class KeycloakConfigServlet extends HttpServlet {
     private TemplateRenderer templateRenderer;
 
     public KeycloakConfigServlet(PluginSettingsFactory factory, TemplateRenderer renderer, UserManager manager, LoginUriProvider loginUriProvider) {
+
         pluginSettingsFactory = factory;
         templateRenderer = renderer;
         userManager = manager;
@@ -57,10 +59,13 @@ public class KeycloakConfigServlet extends HttpServlet {
         validValues.add(REALM_KEY);
         validValues.add(AUTH_SERVER_BASEURL_KEY);
         validValues.add(RESOURCE_KEY);
+        validValues.add(PUBLIC_CLIENT_KEY);
+        validValues.add(SECRET_KEY);
     }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
         UserProfile user = userManager.getRemoteUser(request);
         if (user == null) {
             redirectToLogin(request, response);
@@ -74,14 +79,10 @@ public class KeycloakConfigServlet extends HttpServlet {
 
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
 
-
-        Map<String, String> kd = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Map<String, Object> context = new HashMap<>();
-
-        String stuff = (String) retrieveAndRemove(settings, "myAdapterConfigKey");
-        stuff = stuff == null ? "got some Exception" : stuff;
-        context.put("map", kd);
-        context.put("stuff", stuff);
+        log.warn(config.get(PUBLIC_CLIENT_KEY));
+        context.put("map", config);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
         templateRenderer.render(CONFIG_TEMPLATE, context, response.getWriter());
@@ -98,19 +99,21 @@ public class KeycloakConfigServlet extends HttpServlet {
         while (parameters.hasMoreElements()) {
             retrieveAndStore(request, parameters.nextElement(), config);
         }
-        settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY,config);
+        settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY, config);
         settings.put(UPDATED_SETTINGS_KEY, "True");
-        response.sendRedirect(request.getContextPath()+request.getServletPath());
+        response.sendRedirect(request.getContextPath() + request.getServletPath());
 
     }
 
 
     /**
      * tests, whether a given parameter is a supported/valid configuration key
+     *
      * @param param the param to test
      * @return TRUE, if the param was a valid configuration key, false otherwise
      */
     private boolean isValidValue(String param) {
+
         return validValues.contains(param);
     }
 
@@ -119,21 +122,25 @@ public class KeycloakConfigServlet extends HttpServlet {
      * @return returns (@code TRUE) if the user is an admin or systemadmin
      */
     private boolean hasAccessRights(UserProfile profile) {
+
         return userManager.isAdmin(profile.getUserKey()) || userManager.isSystemAdmin(profile.getUserKey());
     }
 
     /**
      * redirects a user to jira's login page if he was not logged in. wont be called if the user wants to use keycloak
      * since the filter will act prior
-     * @param request the request with the missing user
+     *
+     * @param request  the request with the missing user
      * @param response the response to redirect
      * @throws IOException if the redirect fails
      */
     private void redirectToLogin(HttpServletRequest request, HttpServletResponse response) throws IOException {
+
         response.sendRedirect(loginUriProvider.getLoginUri(getUri(request)).toASCIIString());
     }
 
     private URI getUri(HttpServletRequest request) {
+
         StringBuffer builder = request.getRequestURL();
         if (request.getQueryString() != null) {
             builder.append("?");
@@ -146,11 +153,13 @@ public class KeycloakConfigServlet extends HttpServlet {
     /**
      * redirects the user, when it was determined that he does not have sufficient privileges. this differs, when a user
      * is authenticated to keycloak or not
-     * @param request the given http-request
+     *
+     * @param request  the given http-request
      * @param response the response to redirect
      * @throws IOException if the redirect cannot be send
      */
     private void handleUnauthorizedAccess(HttpServletRequest request, HttpServletResponse response) throws IOException {
+
         if (request.getSession().getAttribute(KeycloakSecurityContext.class.getName()) == null) {
             response.sendRedirect(loginUriProvider.getLoginUriForRole(getUri(request), UserRole.ADMIN).toASCIIString());
         } else
@@ -160,11 +169,13 @@ public class KeycloakConfigServlet extends HttpServlet {
 
     /**
      * Retrieves and removes the value of the given key from the settings
+     *
      * @param settings the settings to search
-     * @param key the key whose value should be retrieved
+     * @param key      the key whose value should be retrieved
      * @return the value of the key, NULL if the key is missing
      */
     private Object retrieveAndRemove(PluginSettings settings, String key) {
+
         Object returnObject = settings.get(key);
         settings.remove(key);
         return returnObject;
@@ -173,11 +184,13 @@ public class KeycloakConfigServlet extends HttpServlet {
 
     /**
      * retrieves a given parameter of a request and puts its value into a map
-     * @param request the request holding the parameter
+     *
+     * @param request      the request holding the parameter
      * @param parameterKey the parameter to retrieve
-     * @param storage the map where the parameter, value pair should be stored
+     * @param storage      the map where the parameter, value pair should be stored
      */
     private void retrieveAndStore(HttpServletRequest request, String parameterKey, Map<String, String> storage) {
+
         if (isValidValue(parameterKey)) {
             String temp = request.getParameter(parameterKey);
             storage.put(parameterKey, temp);
