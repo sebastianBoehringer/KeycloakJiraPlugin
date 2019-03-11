@@ -29,7 +29,6 @@ import java.util.*;
 public class KeycloakConfigServlet extends HttpServlet {
     private static final Logger log = LoggerFactory.getLogger(KeycloakConfigServlet.class);
     public static final String UPDATED_SETTINGS_KEY = KeycloakConfigServlet.class.getName() + "-keycloakJiraPlugin-settingsUpdatedKey";
-    private static List<String> validValues;
     public static final String REALM = "realm";
     public static final String PUBLIC_CLIENT = "public-client";
     public static final String RESOURCE = "resource";
@@ -72,6 +71,15 @@ public class KeycloakConfigServlet extends HttpServlet {
 
     private final static String PAGE_VM = "/templates/keycloakJiraPlugin_ConfigPage.vm";
 
+    public static List<String> validValues = Arrays.asList(REALM, AUTH_SERVER_URL, RESOURCE, PUBLIC_CLIENT, SECRET,
+            REALM_PUBLIC_KEY, REGISTER_NODE_AT_STARTUP, REGISTER_NODE_PERIOD, SSL_REQUIRED, CONFIDENTIAL_PORT,
+            USE_RESOURCE_ROLE_MAPPINGS, ENABLE_CORS, CORS_MAX_AGE, CORS_ALLOWED_HEADERS, CORS_ALLOWED_METHODS,
+            CORS_EXPOSED_HEADERS, BEARER_ONLY, AUTODETECT_BEARER_ONLY, ENABLE_BASIC_AUTH, EXPOSE_TOKEN,
+            CONNECTION_POOL_SIZE, DISABLE_TRUST_MANAGER, ALLOW_ANY_HOSTNAME, PROXY_URL, TRUSTSTORE, TRUSTSTORE_PASSWORD,
+            CLIENT_KEYSTORE, CLIENT_KEYSTORE_PASSWORD, CLIENT_KEY_PASSWORD, ALWAYS_REFRESH_TOKEN, TOKEN_STORE, TOKEN_COOKIE_PATH,
+            PRINCIPAL_ATTRIBUTE, TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN, TOKEN_MINIMUM_TIME_TO_LIVE, MIN_TIME_BETWEEN_JWKS_REQUEST,
+            PUBLIC_KEY_CACHE_TTL, IGNORE_OAUTH_QUERY_PARAM, VERIFY_AUDIENCE);
+
     @ComponentImport
     private final LoginUriProvider loginUriProvider;
 
@@ -91,46 +99,6 @@ public class KeycloakConfigServlet extends HttpServlet {
         templateRenderer = renderer;
         userManager = manager;
         this.loginUriProvider = loginUriProvider;
-        validValues = new ArrayList<>();
-        validValues.add(REALM);
-        validValues.add(AUTH_SERVER_URL);
-        validValues.add(RESOURCE);
-        validValues.add(PUBLIC_CLIENT);
-        validValues.add(SECRET);
-        validValues.add(REALM_PUBLIC_KEY);
-        validValues.add(REGISTER_NODE_AT_STARTUP);
-        validValues.add(REGISTER_NODE_PERIOD);
-        validValues.add(SSL_REQUIRED);
-        validValues.add(CONFIDENTIAL_PORT);
-        validValues.add(USE_RESOURCE_ROLE_MAPPINGS);
-        validValues.add(ENABLE_CORS);
-        validValues.add(CORS_MAX_AGE);
-        validValues.add(CORS_ALLOWED_HEADERS);
-        validValues.add(CORS_ALLOWED_METHODS);
-        validValues.add(CORS_EXPOSED_HEADERS);
-        validValues.add(BEARER_ONLY);
-        validValues.add(AUTODETECT_BEARER_ONLY);
-        validValues.add(ENABLE_BASIC_AUTH);
-        validValues.add(EXPOSE_TOKEN);
-        validValues.add(CONNECTION_POOL_SIZE);
-        validValues.add(DISABLE_TRUST_MANAGER);
-        validValues.add(ALLOW_ANY_HOSTNAME);
-        validValues.add(PROXY_URL);
-        validValues.add(TRUSTSTORE);
-        validValues.add(TRUSTSTORE_PASSWORD);
-        validValues.add(CLIENT_KEYSTORE);
-        validValues.add(CLIENT_KEYSTORE_PASSWORD);
-        validValues.add(CLIENT_KEY_PASSWORD);
-        validValues.add(ALWAYS_REFRESH_TOKEN);
-        validValues.add(TOKEN_STORE);
-        validValues.add(TOKEN_COOKIE_PATH);
-        validValues.add(PRINCIPAL_ATTRIBUTE);
-        validValues.add(TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN);
-        validValues.add(TOKEN_MINIMUM_TIME_TO_LIVE);
-        validValues.add(MIN_TIME_BETWEEN_JWKS_REQUEST);
-        validValues.add(PUBLIC_KEY_CACHE_TTL);
-        validValues.add(IGNORE_OAUTH_QUERY_PARAM);
-        validValues.add(VERIFY_AUDIENCE);
     }
 
     @Override
@@ -148,12 +116,10 @@ public class KeycloakConfigServlet extends HttpServlet {
             return;
         }
 
-        PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-        String yoo = (String) settings.get("ichVerzweifle");
-        Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        PluginSettings settings = pluginSettingsFactory.createSettingsForKey(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        Map<String, Object> config = getSettingsAsMap(settings);
         Map<String, Object> context = new HashMap<>();
         context.put("map", config);
-        context.put("d", yoo);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
         templateRenderer.render(PAGE_VM, context, response.getWriter());
@@ -163,15 +129,12 @@ public class KeycloakConfigServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
-        PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-        Map<String, String> config = (Map<String, String>) retrieveAndRemove(settings, AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
-        HashMap<String, String> heyo = new HashMap<>();
+        PluginSettings settings = pluginSettingsFactory.createSettingsForKey(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Enumeration<String> parameters = request.getParameterNames();
-        if (config != null)
-            while (parameters.hasMoreElements()) {
-                retrieveAndStore(request, parameters.nextElement(), heyo);
-            }
-        settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY, config);
+        while (parameters.hasMoreElements()) {
+            String param = parameters.nextElement();
+            storeInSettings(settings, param, request.getParameter(param));
+        }
         settings.put(UPDATED_SETTINGS_KEY, "True");
         response.sendRedirect(request.getContextPath() + request.getServletPath());
 
@@ -257,16 +220,24 @@ public class KeycloakConfigServlet extends HttpServlet {
     /**
      * retrieves a given parameter of a request and puts its value into a map
      *
-     * @param request      the request holding the parameter
-     * @param parameterKey the parameter to retrieve
-     * @param storage      the map where the parameter, value pair should be stored
+     * @param value    the value of the (@param)key
+     * @param key      the key which value should be stored
+     * @param settings the Pluginsettings which should store the key-value-pair
      */
-    private void retrieveAndStore(HttpServletRequest request, String parameterKey, Map<String, String> storage) {
+    private void storeInSettings(PluginSettings settings, String key, String value) {
 
-        if (isValidValue(parameterKey)) {
-            String temp = request.getParameter(parameterKey);
-            storage.put(parameterKey, temp);
+        if (isValidValue(key)) {
+            settings.put(key, value);
         }
+    }
+
+    private Map<String, Object> getSettingsAsMap(PluginSettings settings) {
+
+        Map<String, Object> config = new HashMap<>();
+        for (String key : validValues) {
+            config.put(key, settings.get(key));
+        }
+        return config;
     }
 }
 //https://community.atlassian.com/t5/Answers-Developer-Questions/Retrieving-Plug-in-settings-using-PluginSettingsFactory/qaq-p/483804

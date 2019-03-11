@@ -7,7 +7,7 @@
 <div align="center">
     <h1>Here you can configure the plugin deployment</h1>
     See the <a href="https://www.keycloak.org/docs/4.8/securing_apps/index.html#java-adapters">official
-    Documentation</a> $d
+    Documentation</a> {$d}
     for further details on what each option does.
     <form method="post" action="$requestUrl">
         <table>
