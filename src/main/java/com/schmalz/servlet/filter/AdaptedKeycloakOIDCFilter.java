@@ -44,6 +44,7 @@ import org.keycloak.adapters.spi.KeycloakAccount;
 import org.keycloak.representations.adapters.config.AdapterConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
@@ -66,9 +67,9 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private boolean disabled = false;
     private boolean debugeMode = false;
 
+
     @ComponentImport
     private final CrowdService crowdService;
-
     @ComponentImport
     private final PluginSettingsFactory pluginSettingsFactory;
 
@@ -80,7 +81,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
      *
      * @param definedconfigResolver the resolver
      */
-
     private AdaptedKeycloakOIDCFilter(KeycloakConfigResolver definedconfigResolver,
                                       PluginSettingsFactory factory, CrowdService crowdService) {
 
@@ -109,20 +109,26 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         //saving filterconfig so i can easily access the json-file later
         filterConfiguration = filterConfig;
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
+        InputStream is2 = filterConfig.getServletContext().getResourceAsStream(path);
         if (is != null) {
+            disabled = false;
             AdapterConfig deployment = KeycloakDeploymentBuilder.loadAdapterConfig(is);
+            KeycloakDeployment ment = KeycloakDeploymentBuilder.build(is2);
             /*
             plugin settings can only store: String, List<String>, Map<String,String>; thread below describes other possibilities
             */
             //https://community.atlassian.com/t5/Answers-Developer-Questions/PluginSettings-vs-Active-Objects/qaq-p/485817
             realm = deployment.getRealm();
             authServer = deployment.getAuthServerUrl();
-
+            deploymentContext = new AdapterDeploymentContext(ment);
             PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
+            settings.put("ichVerzweifle", "test");
             Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
-            if (possiblyDifferentSettings != null) {
-
+            this.deploymentContext = new AdapterDeploymentContext(ment);
+            if (!CollectionUtils.isEmpty(possiblyDifferentSettings)) {
                 //method only changes the deploymentcontext so it does not need to know about the persisted settings
+                HashMap<String, String> map = initFromConfig(deployment);
+                settings.put(SETTINGS_KEY, map);
                 handleUpdate(possiblyDifferentSettings);
 
             } else {
@@ -130,12 +136,12 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
                 fresh instance of JIRA or first time using the plugin, so the basic settings will be imported from the
                 json file
                 */
-                settings.put(SETTINGS_KEY, initFromConfig(deployment));
+                HashMap<String, String> map = initFromConfig(deployment);
+                settings.put(SETTINGS_KEY, map);
             }
 
         } else {
             log.error("could not find configuration file, this plugin will disable itself");
-            disabled = true;
         }
     }
 
@@ -250,7 +256,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         log.info("Found a valid KC user, attempting login to jira");
         User user = crowdService.getUser(userName);
-
         if (user == null) {
             log.debug("Authentication unsuccessful, user does not exist in Jira");
             return false;
@@ -262,7 +267,6 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             }
             session.setAttribute(JiraSeraphAuthenticator.LOGGED_IN_KEY, user);
             log.debug("Successfully authenticated user " + user.getDisplayName() + " to Jira");
-
             return true;
         }
     }
@@ -450,8 +454,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             adapterConfig.setPublicKeyCacheTtl(keyCacheTTL);
             adapterConfig.setVerifyTokenAudience(Boolean.valueOf(config.get(KeycloakConfigServlet.VERIFY_AUDIENCE)));
 
-
-            deploymentContext.updateDeployment(adapterConfig);
+            KeycloakDeployment ment = KeycloakDeploymentBuilder.build(adapterConfig);
+            deploymentContext = new AdapterDeploymentContext(ment);
         } catch (Exception e) {
             log.warn(e.getMessage());
         }
@@ -459,7 +463,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     }
 
-    private Map<String, String> initFromConfig(AdapterConfig config) {
+    private HashMap<String, String> initFromConfig(AdapterConfig config) {
         HashMap<String, String> toStore = new HashMap<>();
         toStore.put(KeycloakConfigServlet.REALM, config.getRealm());
         toStore.put(KeycloakConfigServlet.RESOURCE, config.getResource());

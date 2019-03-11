@@ -84,7 +84,8 @@ public class KeycloakConfigServlet extends HttpServlet {
     @ComponentImport
     private TemplateRenderer templateRenderer;
 
-    public KeycloakConfigServlet(PluginSettingsFactory factory, TemplateRenderer renderer, UserManager manager, LoginUriProvider loginUriProvider) {
+    public KeycloakConfigServlet(PluginSettingsFactory factory, TemplateRenderer renderer,
+                                 UserManager manager, LoginUriProvider loginUriProvider) {
 
         pluginSettingsFactory = factory;
         templateRenderer = renderer;
@@ -138,19 +139,21 @@ public class KeycloakConfigServlet extends HttpServlet {
         UserProfile user = userManager.getRemoteUser(request);
         if (user == null) {
             redirectToLogin(request, response);
+            log.warn("Somebody tried to access this page while not logged in");
             return;
         }
         if (!hasAccessRights(user)) {
             handleUnauthorizedAccess(request, response);
-
+            log.warn("User " + user.getUsername() + " does not have sufficient rights");
             return;
         }
 
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-
+        String yoo = (String) settings.get("ichVerzweifle");
         Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Map<String, Object> context = new HashMap<>();
         context.put("map", config);
+        context.put("d", yoo);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
         templateRenderer.render(PAGE_VM, context, response.getWriter());
@@ -162,11 +165,12 @@ public class KeycloakConfigServlet extends HttpServlet {
 
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
         Map<String, String> config = (Map<String, String>) retrieveAndRemove(settings, AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        HashMap<String, String> heyo = new HashMap<>();
         Enumeration<String> parameters = request.getParameterNames();
-
-        while (parameters.hasMoreElements()) {
-            retrieveAndStore(request, parameters.nextElement(), config);
-        }
+        if (config != null)
+            while (parameters.hasMoreElements()) {
+                retrieveAndStore(request, parameters.nextElement(), heyo);
+            }
         settings.put(AdaptedKeycloakOIDCFilter.SETTINGS_KEY, config);
         settings.put(UPDATED_SETTINGS_KEY, "True");
         response.sendRedirect(request.getContextPath() + request.getServletPath());
