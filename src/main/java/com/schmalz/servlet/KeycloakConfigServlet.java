@@ -30,12 +30,47 @@ public class KeycloakConfigServlet extends HttpServlet {
     private static final Logger log = LoggerFactory.getLogger(KeycloakConfigServlet.class);
     public static final String UPDATED_SETTINGS_KEY = KeycloakConfigServlet.class.getName() + "-keycloakJiraPlugin-settingsUpdatedKey";
     private static List<String> validValues;
-    public static final String REALM_KEY = "realm";
-    public static final String PUBLIC_CLIENT_KEY = "publicClient";
-    public static final String RESOURCE_KEY = "resource";
-    public static final String AUTH_SERVER_BASEURL_KEY = "authServerUrl";
-    public static final String SECRET_KEY = "secret";
-    private final static String CONFIG_TEMPLATE = "/templates/keycloakJiraPlugin_ConfigPage.vm";
+    public static final String REALM = "realm";
+    public static final String PUBLIC_CLIENT = "public-client";
+    public static final String RESOURCE = "resource";
+    public static final String AUTH_SERVER_URL = "auth-server-url";
+    public static final String SECRET = "secret";
+    public static final String REALM_PUBLIC_KEY = "realm-public-key";
+    public static final String SSL_REQUIRED = "ssl-required";
+    public static final String CONFIDENTIAL_PORT = "confidential-port";
+    public static final String USE_RESOURCE_ROLE_MAPPINGS = "use-resource-role-mappings";
+    public static final String ENABLE_CORS = "enable-cors";
+    public static final String CORS_MAX_AGE = "cors-max-age";
+    public static final String CORS_ALLOWED_METHODS = "cors-allowed-methodes";
+    public static final String CORS_ALLOWED_HEADERS = "cors-allowed-headers";
+    public static final String CORS_EXPOSED_HEADERS = "cors-exposed-header";
+    public static final String BEARER_ONLY = "bearer-only";
+    public static final String AUTODETECT_BEARER_ONLY = "autodetect-bearer-only";
+    public static final String ENABLE_BASIC_AUTH = "enable-basic-auth";
+    public static final String EXPOSE_TOKEN = "expose-token";
+    public static final String CONNECTION_POOL_SIZE = "connection-pool-size";
+    public static final String DISABLE_TRUST_MANAGER = "disable-trust-manager";
+    public static final String ALLOW_ANY_HOSTNAME = "allow-any-hostname";
+    public static final String PROXY_URL = "proxy-url";
+    public static final String TRUSTSTORE = "truststore";
+    public static final String TRUSTSTORE_PASSWORD = "truststore-password";
+    public static final String CLIENT_KEYSTORE = "client-keystore";
+    public static final String CLIENT_KEYSTORE_PASSWORD = "client-keystore-password";
+    public static final String CLIENT_KEY_PASSWORD = "client-key-password";
+    public static final String ALWAYS_REFRESH_TOKEN = "always-refresh-token";
+    public static final String REGISTER_NODE_AT_STARTUP = "register-node-at-startup";
+    public static final String REGISTER_NODE_PERIOD = "register-node-period";
+    public static final String TOKEN_STORE = "token-store";
+    public static final String TOKEN_COOKIE_PATH = "token-cookie-path";
+    public static final String PRINCIPAL_ATTRIBUTE = "principal-attribute";
+    public static final String TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN = "turn-off-change-session-id-on-login";
+    public static final String TOKEN_MINIMUM_TIME_TO_LIVE = "token-minimum-time-to-live";
+    public static final String MIN_TIME_BETWEEN_JWKS_REQUEST = "min-time-between-jwks-requests";
+    public static final String PUBLIC_KEY_CACHE_TTL = "public-key-cache-ttl";
+    public static final String IGNORE_OAUTH_QUERY_PARAM = "ignore-oauth-query-parameter";
+    public static final String VERIFY_AUDIENCE = "verify-token-audience";
+
+    private final static String PAGE_VM = "/templates/keycloakJiraPlugin_ConfigPage.vm";
 
     @ComponentImport
     private final LoginUriProvider loginUriProvider;
@@ -56,11 +91,45 @@ public class KeycloakConfigServlet extends HttpServlet {
         userManager = manager;
         this.loginUriProvider = loginUriProvider;
         validValues = new ArrayList<>();
-        validValues.add(REALM_KEY);
-        validValues.add(AUTH_SERVER_BASEURL_KEY);
-        validValues.add(RESOURCE_KEY);
-        validValues.add(PUBLIC_CLIENT_KEY);
-        validValues.add(SECRET_KEY);
+        validValues.add(REALM);
+        validValues.add(AUTH_SERVER_URL);
+        validValues.add(RESOURCE);
+        validValues.add(PUBLIC_CLIENT);
+        validValues.add(SECRET);
+        validValues.add(REALM_PUBLIC_KEY);
+        validValues.add(REGISTER_NODE_AT_STARTUP);
+        validValues.add(REGISTER_NODE_PERIOD);
+        validValues.add(SSL_REQUIRED);
+        validValues.add(CONFIDENTIAL_PORT);
+        validValues.add(USE_RESOURCE_ROLE_MAPPINGS);
+        validValues.add(ENABLE_CORS);
+        validValues.add(CORS_MAX_AGE);
+        validValues.add(CORS_ALLOWED_HEADERS);
+        validValues.add(CORS_ALLOWED_METHODS);
+        validValues.add(CORS_EXPOSED_HEADERS);
+        validValues.add(BEARER_ONLY);
+        validValues.add(AUTODETECT_BEARER_ONLY);
+        validValues.add(ENABLE_BASIC_AUTH);
+        validValues.add(EXPOSE_TOKEN);
+        validValues.add(CONNECTION_POOL_SIZE);
+        validValues.add(DISABLE_TRUST_MANAGER);
+        validValues.add(ALLOW_ANY_HOSTNAME);
+        validValues.add(PROXY_URL);
+        validValues.add(TRUSTSTORE);
+        validValues.add(TRUSTSTORE_PASSWORD);
+        validValues.add(CLIENT_KEYSTORE);
+        validValues.add(CLIENT_KEYSTORE_PASSWORD);
+        validValues.add(CLIENT_KEY_PASSWORD);
+        validValues.add(ALWAYS_REFRESH_TOKEN);
+        validValues.add(TOKEN_STORE);
+        validValues.add(TOKEN_COOKIE_PATH);
+        validValues.add(PRINCIPAL_ATTRIBUTE);
+        validValues.add(TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN);
+        validValues.add(TOKEN_MINIMUM_TIME_TO_LIVE);
+        validValues.add(MIN_TIME_BETWEEN_JWKS_REQUEST);
+        validValues.add(PUBLIC_KEY_CACHE_TTL);
+        validValues.add(IGNORE_OAUTH_QUERY_PARAM);
+        validValues.add(VERIFY_AUDIENCE);
     }
 
     @Override
@@ -81,11 +150,10 @@ public class KeycloakConfigServlet extends HttpServlet {
 
         Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Map<String, Object> context = new HashMap<>();
-        log.warn(config.get(PUBLIC_CLIENT_KEY));
         context.put("map", config);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
-        templateRenderer.render(CONFIG_TEMPLATE, context, response.getWriter());
+        templateRenderer.render(PAGE_VM, context, response.getWriter());
         //https://developer.atlassian.com/server/jira/platform/creating-a-jira-issue-crud-servlet-and-issue-search/
     }
 
@@ -93,7 +161,7 @@ public class KeycloakConfigServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
         PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
-        Map<String, String> config = (Map<String, String>) settings.get(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        Map<String, String> config = (Map<String, String>) retrieveAndRemove(settings, AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
         Enumeration<String> parameters = request.getParameterNames();
 
         while (parameters.hasMoreElements()) {

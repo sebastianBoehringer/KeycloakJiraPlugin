@@ -110,30 +110,27 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         filterConfiguration = filterConfig;
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
         if (is != null) {
-            KeycloakDeployment deployment = KeycloakDeploymentBuilder.build(is);
+            AdapterConfig deployment = KeycloakDeploymentBuilder.loadAdapterConfig(is);
             /*
             plugin settings can only store: String, List<String>, Map<String,String>; thread below describes other possibilities
             */
             //https://community.atlassian.com/t5/Answers-Developer-Questions/PluginSettings-vs-Active-Objects/qaq-p/485817
             realm = deployment.getRealm();
-            authServer = deployment.getAuthServerBaseUrl();
-            this.deploymentContext = new AdapterDeploymentContext(deployment);
+            authServer = deployment.getAuthServerUrl();
 
             PluginSettings settings = pluginSettingsFactory.createGlobalSettings();
             Map<String, String> possiblyDifferentSettings = (Map<String, String>) settings.get(SETTINGS_KEY);
             if (possiblyDifferentSettings != null) {
 
+                //method only changes the deploymentcontext so it does not need to know about the persisted settings
                 handleUpdate(possiblyDifferentSettings);
 
             } else {
-                HashMap<String, String> toStore = new HashMap<>();
-                toStore.put(KeycloakConfigServlet.REALM_KEY, realm);
-                toStore.put(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY, authServer);
-                toStore.put(KeycloakConfigServlet.RESOURCE_KEY, deployment.getResourceName());
-                toStore.put(KeycloakConfigServlet.PUBLIC_CLIENT_KEY, Boolean.toString(deployment.isPublicClient()));
-                settings.put(SETTINGS_KEY, toStore);
-
-
+                /*
+                fresh instance of JIRA or first time using the plugin, so the basic settings will be imported from the
+                json file
+                */
+                settings.put(SETTINGS_KEY, initFromConfig(deployment));
             }
 
         } else {
@@ -313,28 +310,148 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     private void handleUpdate(Map<String, String> config) {
 
         try (InputStream is = filterConfiguration.getServletContext().getResourceAsStream("/keycloak.json")) {
-            realm = config.get(KeycloakConfigServlet.REALM_KEY) != null ? config.get(KeycloakConfigServlet.REALM_KEY) : realm;
-            authServer = config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) != null ? config.get(KeycloakConfigServlet.AUTH_SERVER_BASEURL_KEY) : authServer;
-            resource = config.get(KeycloakConfigServlet.RESOURCE_KEY) != null ? config.get(KeycloakConfigServlet.RESOURCE_KEY) : resource;
+            realm = config.get(KeycloakConfigServlet.REALM) != null ? config.get(KeycloakConfigServlet.REALM) : realm;
+            authServer = config.get(KeycloakConfigServlet.AUTH_SERVER_URL) != null ? config.get(KeycloakConfigServlet.AUTH_SERVER_URL) : authServer;
+            resource = config.get(KeycloakConfigServlet.RESOURCE) != null ? config.get(KeycloakConfigServlet.RESOURCE) : resource;
+
             AdapterConfig adapterConfig = KeycloakDeploymentBuilder.loadAdapterConfig(is);
-            String pC = config.get(KeycloakConfigServlet.PUBLIC_CLIENT_KEY);
-            Boolean publicClient = pC == null ? adapterConfig.isPublicClient() : Boolean.valueOf(pC);
-            String secret = config.get(KeycloakConfigServlet.SECRET_KEY);
+
+            String secret = config.get(KeycloakConfigServlet.SECRET);
             Map<String, Object> credentials = adapterConfig.getCredentials();
             credentials.put("secret", secret);
+
+            String realmPublicKey = config.get(KeycloakConfigServlet.REALM_PUBLIC_KEY);
+
+            String ssl = config.get(KeycloakConfigServlet.SSL_REQUIRED);
+
+            int confidentialPort;
+            try {
+                confidentialPort = Integer.parseInt(config.get(KeycloakConfigServlet.CONFIDENTIAL_PORT));
+            } catch (NumberFormatException e) {
+                confidentialPort = 8443;
+            }
+
+            //defaults to false
+            boolean enableCors = Boolean.valueOf(config.get(KeycloakConfigServlet.ENABLE_CORS));
+
+            int poolSize;
+            try {
+                poolSize = Integer.parseInt(config.get(KeycloakConfigServlet.CONNECTION_POOL_SIZE));
+            } catch (NumberFormatException e) {
+                //default value from Keycloak documentation
+                poolSize = 20;
+            }
+
+            String proxy = config.get(KeycloakConfigServlet.PROXY_URL) != null ?
+                    config.get(KeycloakConfigServlet.PROXY_URL) : adapterConfig.getProxyUrl();
+
+            String truststore = config.get(KeycloakConfigServlet.TRUSTSTORE) != null ?
+                    config.get(KeycloakConfigServlet.TRUSTSTORE) : adapterConfig.getTruststore();
+
+            String truststorePassword = config.get(KeycloakConfigServlet.TRUSTSTORE_PASSWORD) != null ?
+                    config.get(KeycloakConfigServlet.TRUSTSTORE_PASSWORD) : adapterConfig.getTruststorePassword();
+
+            String clientKeystore = config.get(KeycloakConfigServlet.CLIENT_KEYSTORE);
+
+            int registerNodePeriod;
+            try {
+                registerNodePeriod = Integer.parseInt(config.get(KeycloakConfigServlet.REGISTER_NODE_PERIOD));
+            } catch (NumberFormatException e) {
+                registerNodePeriod = 60;
+            }
+
+            String tokenStore = config.get(KeycloakConfigServlet.TOKEN_STORE) != null ?
+                    config.get(KeycloakConfigServlet.TOKEN_STORE) : "Session";
+
+            String principalAttribute = config.get(KeycloakConfigServlet.PRINCIPAL_ATTRIBUTE) != null ?
+                    config.get(KeycloakConfigServlet.PRINCIPAL_ATTRIBUTE) : "sub";
+
+            int minTimeToLive;
+            try {
+                minTimeToLive = Integer.parseInt(config.get(KeycloakConfigServlet.TOKEN_MINIMUM_TIME_TO_LIVE));
+            } catch (NumberFormatException e) {
+                minTimeToLive = 0;
+            }
+
+            int timeBetweenJWKS;
+            try {
+                timeBetweenJWKS = Integer.parseInt(config.get(KeycloakConfigServlet.MIN_TIME_BETWEEN_JWKS_REQUEST));
+            } catch (NumberFormatException e) {
+                timeBetweenJWKS = 10;
+            }
+
+            int keyCacheTTL;
+            try {
+                keyCacheTTL = Integer.parseInt(config.get(KeycloakConfigServlet.PUBLIC_KEY_CACHE_TTL));
+            } catch (NumberFormatException e) {
+                keyCacheTTL = 86400;
+            }
 
 
             /*order is important here */
             adapterConfig.setRealm(realm);
-            adapterConfig.setAuthServerUrl(authServer);
             adapterConfig.setResource(resource);
-            log.warn("set everything that worked");
+            adapterConfig.setRealmKey(realmPublicKey);
+            adapterConfig.setAuthServerUrl(authServer);
+            adapterConfig.setSslRequired(ssl);
+            adapterConfig.setUseResourceRoleMappings(Boolean.valueOf(config.get(KeycloakConfigServlet.USE_RESOURCE_ROLE_MAPPINGS)));
+            adapterConfig.setConfidentialPort(confidentialPort);
+            adapterConfig.setPublicClient(Boolean.valueOf(config.get(KeycloakConfigServlet.PUBLIC_CLIENT)));
 
-            adapterConfig.setPublicClient(publicClient);
+            adapterConfig.setCors(enableCors);
+            if (enableCors) {
+                int corsMaxAge;
+                try {
+                    corsMaxAge = Integer.parseInt(config.get(KeycloakConfigServlet.CORS_MAX_AGE));
+                } catch (NumberFormatException e) {
+                    corsMaxAge = 20;
+                }
+                String allowedMethods = config.get(KeycloakConfigServlet.CORS_ALLOWED_METHODS) != null ?
+                        config.get(KeycloakConfigServlet.CORS_ALLOWED_METHODS) : adapterConfig.getCorsAllowedMethods();
+                String allowedHeaders = config.get(KeycloakConfigServlet.CORS_ALLOWED_HEADERS) != null ?
+                        config.get(KeycloakConfigServlet.CORS_ALLOWED_HEADERS) : adapterConfig.getCorsAllowedHeaders();
+                String exposedHeaders = config.get((KeycloakConfigServlet.CORS_EXPOSED_HEADERS)) != null ?
+                        config.get(KeycloakConfigServlet.CORS_EXPOSED_HEADERS) : adapterConfig.getCorsExposedHeaders();
+
+                adapterConfig.setCorsMaxAge(corsMaxAge);
+                adapterConfig.setCorsAllowedMethods(allowedMethods);
+                adapterConfig.setCorsAllowedHeaders(allowedHeaders);
+                adapterConfig.setCorsExposedHeaders(exposedHeaders);
+            }
+
+            adapterConfig.setBearerOnly(Boolean.valueOf(config.get(KeycloakConfigServlet.BEARER_ONLY)));
+            adapterConfig.setAutodetectBearerOnly(Boolean.valueOf(config.get(KeycloakConfigServlet.AUTODETECT_BEARER_ONLY)));
+            adapterConfig.setEnableBasicAuth(Boolean.valueOf(config.get(KeycloakConfigServlet.ENABLE_BASIC_AUTH)));
+            adapterConfig.setExposeToken(Boolean.valueOf(config.get(KeycloakConfigServlet.EXPOSE_TOKEN)));
             adapterConfig.setCredentials(credentials);
-            KeycloakDeployment ment = KeycloakDeploymentBuilder.build(adapterConfig);
+            adapterConfig.setConnectionPoolSize(poolSize);
+            adapterConfig.setDisableTrustManager(Boolean.valueOf(KeycloakConfigServlet.DISABLE_TRUST_MANAGER));
+            adapterConfig.setAllowAnyHostname(Boolean.valueOf(KeycloakConfigServlet.ALLOW_ANY_HOSTNAME));
+            adapterConfig.setProxyUrl(proxy);
+            adapterConfig.setTruststore(truststore);
+            adapterConfig.setTruststorePassword(truststorePassword);
+            if (clientKeystore != null) {
+                adapterConfig.setClientKeystore(clientKeystore);
+                adapterConfig.setClientKeystorePassword(config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD));
+                adapterConfig.setClientKeyPassword(config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD));
+            }
 
-            deploymentContext = new AdapterDeploymentContext(ment);
+            adapterConfig.setAlwaysRefreshToken(Boolean.valueOf(config.get(KeycloakConfigServlet.ALWAYS_REFRESH_TOKEN)));
+            adapterConfig.setRegisterNodeAtStartup(Boolean.valueOf(config.get(KeycloakConfigServlet.REGISTER_NODE_AT_STARTUP)));
+            adapterConfig.setRegisterNodePeriod(registerNodePeriod);
+            adapterConfig.setTokenStore(tokenStore);
+            if (tokenStore.equalsIgnoreCase("Cookie")) {
+                adapterConfig.setTokenCookiePath(config.get(KeycloakConfigServlet.TOKEN_COOKIE_PATH));
+            }
+            adapterConfig.setPrincipalAttribute(principalAttribute);
+            adapterConfig.setTurnOffChangeSessionIdOnLogin(Boolean.valueOf(config.get(KeycloakConfigServlet.TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN)));
+            adapterConfig.setTokenMinimumTimeToLive(minTimeToLive);
+            adapterConfig.setMinTimeBetweenJwksRequests(timeBetweenJWKS);
+            adapterConfig.setPublicKeyCacheTtl(keyCacheTTL);
+            adapterConfig.setVerifyTokenAudience(Boolean.valueOf(config.get(KeycloakConfigServlet.VERIFY_AUDIENCE)));
+
+
+            deploymentContext.updateDeployment(adapterConfig);
         } catch (Exception e) {
             log.warn(e.getMessage());
         }
@@ -342,4 +459,57 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
     }
 
+    private Map<String, String> initFromConfig(AdapterConfig config) {
+        HashMap<String, String> toStore = new HashMap<>();
+        toStore.put(KeycloakConfigServlet.REALM, config.getRealm());
+        toStore.put(KeycloakConfigServlet.RESOURCE, config.getResource());
+        toStore.put(KeycloakConfigServlet.REALM_PUBLIC_KEY, config.getRealmKey());
+        toStore.put(KeycloakConfigServlet.AUTH_SERVER_URL, config.getAuthServerUrl());
+        toStore.put(KeycloakConfigServlet.SSL_REQUIRED, config.getSslRequired());
+        toStore.put(KeycloakConfigServlet.CONFIDENTIAL_PORT, getString(config.getConfidentialPort()));
+        toStore.put(KeycloakConfigServlet.USE_RESOURCE_ROLE_MAPPINGS, getString(config.isUseResourceRoleMappings()));
+        toStore.put(KeycloakConfigServlet.PUBLIC_CLIENT, getString(config.isPublicClient()));
+        toStore.put(KeycloakConfigServlet.ENABLE_CORS, getString(config.isCors()));
+        toStore.put(KeycloakConfigServlet.CORS_ALLOWED_HEADERS, config.getCorsAllowedHeaders());
+        toStore.put(KeycloakConfigServlet.CORS_ALLOWED_METHODS, config.getCorsAllowedMethods());
+        toStore.put(KeycloakConfigServlet.CORS_EXPOSED_HEADERS, config.getCorsExposedHeaders());
+        toStore.put(KeycloakConfigServlet.CORS_MAX_AGE, getString(config.getCorsMaxAge()));
+        toStore.put(KeycloakConfigServlet.BEARER_ONLY, getString(config.isBearerOnly()));
+        toStore.put(KeycloakConfigServlet.AUTODETECT_BEARER_ONLY, getString(config.isAutodetectBearerOnly()));
+        toStore.put(KeycloakConfigServlet.ENABLE_BASIC_AUTH, getString(config.isEnableBasicAuth()));
+        toStore.put(KeycloakConfigServlet.EXPOSE_TOKEN, getString(config.isExposeToken()));
+        toStore.put(KeycloakConfigServlet.SECRET, (String) config.getCredentials().get("secret"));
+        toStore.put(KeycloakConfigServlet.CONNECTION_POOL_SIZE, getString(config.getConnectionPoolSize()));
+        toStore.put(KeycloakConfigServlet.DISABLE_TRUST_MANAGER, getString(config.isDisableTrustManager()));
+        toStore.put(KeycloakConfigServlet.ALLOW_ANY_HOSTNAME, getString(config.isAllowAnyHostname()));
+        toStore.put(KeycloakConfigServlet.PROXY_URL, config.getProxyUrl());
+        toStore.put(KeycloakConfigServlet.TRUSTSTORE, config.getTruststore());
+        toStore.put(KeycloakConfigServlet.TRUSTSTORE_PASSWORD, config.getTruststorePassword());
+        toStore.put(KeycloakConfigServlet.CLIENT_KEYSTORE, config.getClientKeystore());
+        toStore.put(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD, config.getClientKeystorePassword());
+        toStore.put(KeycloakConfigServlet.CLIENT_KEY_PASSWORD, config.getClientKeyPassword());
+        toStore.put(KeycloakConfigServlet.ALWAYS_REFRESH_TOKEN, getString(config.isAlwaysRefreshToken()));
+        toStore.put(KeycloakConfigServlet.REGISTER_NODE_PERIOD, getString(config.getRegisterNodePeriod()));
+        toStore.put(KeycloakConfigServlet.REGISTER_NODE_AT_STARTUP, getString(config.isRegisterNodeAtStartup()));
+        toStore.put(KeycloakConfigServlet.TOKEN_STORE, config.getTokenStore());
+        toStore.put(KeycloakConfigServlet.TOKEN_COOKIE_PATH, config.getTokenCookiePath());
+        toStore.put(KeycloakConfigServlet.PRINCIPAL_ATTRIBUTE, config.getPrincipalAttribute());
+        toStore.put(KeycloakConfigServlet.TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN, getString(config.getTurnOffChangeSessionIdOnLogin()));
+        toStore.put(KeycloakConfigServlet.TOKEN_MINIMUM_TIME_TO_LIVE, getString(config.getTokenMinimumTimeToLive()));
+        toStore.put(KeycloakConfigServlet.MIN_TIME_BETWEEN_JWKS_REQUEST, getString(config.getMinTimeBetweenJwksRequests()));
+        toStore.put(KeycloakConfigServlet.PUBLIC_KEY_CACHE_TTL, getString(config.getPublicKeyCacheTtl()));
+        toStore.put(KeycloakConfigServlet.IGNORE_OAUTH_QUERY_PARAM, getString(config.isIgnoreOAuthQueryParameter()));
+        toStore.put(KeycloakConfigServlet.VERIFY_AUDIENCE, getString(config.isVerifyTokenAudience()));
+        return toStore;
+    }
+
+    private String getString(int number) {
+        Integer box = number;
+        return box.toString();
+    }
+
+    private String getString(boolean bool) {
+        Boolean b = bool;
+        return b.toString();
+    }
 }

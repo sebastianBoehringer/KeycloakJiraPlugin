@@ -6,15 +6,17 @@
 <body>
 <div align="center">
     <h1>Here you can configure the plugin deployment</h1>
-    Hello user $username !!
+    See the <a href="https://www.keycloak.org/docs/4.8/securing_apps/index.html#java-adapters">official
+    Documentation</a>
+    for further details on what each option does.
 
     <form method="post" action="$requestUrl">
         <label>Keycloakresource</label>
-        <input type="text" value="$map.resource" required="required" name="resource">
+        <input type="text" value="$map.resource" required="required" size="50" name="resource">
         <br/>
 
         <label>KeycloakbaseURL</label>
-        <input type="text" value="$map.authServerUrl" required="required" name="authServerUrl">
+        <input type="url" value="$map.auth-server-url" required="required" size="50" name="auth-server-url">
         <br/>
 
         <label>Keycloakrealm</label>
@@ -25,29 +27,181 @@
         #set($richtig = "true")
 
         <label>Public client</label>
-        <fieldset id="publicClient">
-            Ja <input type="radio" value="true" name="publicClient" id="publicClientTrue"
+        <fieldset id="public-client">
+            Ja <input type="radio" value="true" name="public-client" id="publicClientTrue"
                       onclick="document.getElementById('secret').disabled = true; document.getElementById('secret').required=false"
-                      #if ($map.publicClient == $richtig)checked="checked" #end>
-            Nein <input type="radio" value="false" name="publicClient" id="publicClientFalse"
+                      #if ($map.public-client == $richtig)checked="checked" #end>
+            Nein <input type="radio" value="false" name="public-client" id="publicClientFalse"
                         onclick="document.getElementById('secret').disabled = false; document.getElementById('secret').required=true"
-            #if ($map.publicClient == $falsch) checked="checked #end">
+            #if ($map.public-client == $falsch) checked="checked #end">
         </fieldset>
+        <br/>
 
         <label> Client Secret</label>
-        <input type="text" name="secret" id="secret" value="$map.secret" #if ($map.publicClient == $richtig)
+        <input type="text" name="secret" id="secret" value="$map.secret" size="100" #if ($map.publicClient == $richtig)
                disabled="disabled" #{else} required="required"#end>
+        <br/>
 
-        <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;"
-               type="radio" name="type" checked="checked">
-        <input type="text" name="custom" id="custom" placeholder="should be 5 charecters at least">
-        <br><br>
-        <input onclick="document.getElementById('custom').disabled = true; document.getElementById('charstype').disabled = false;"
-               type="radio" name="type" value="customurl">random?
-        <select name="charstype" id="charstype" disabled="disabled">
-            <option>Letters</option>
-            <option>Number</option>
+        <label>SSL required</label>
+        <select name="ssl-required">
+            <option>All</option>
+            <option>External</option>
+            <option>None</option>
         </select>
+        <br/>
+
+        <label>Confidential port</label>
+        <input type="number" name="confidential-port" maxlength="5">
+        <br/>
+
+        <label>Use resource role mappings</label>
+        Ja <input name="use-resource-role-mappings" type="radio" value="true">
+        Nein <input name="use-resource-role-mappings" type="radio" value="false">
+        <br/>
+
+        <label>Enable CORS</label>
+        ja <input name="enable-cors" type="radio" value="true">
+        Nein <input name="enable-cors" type="radio" value="false">
+        <br/>
+
+        <label>CORS Max Age</label>
+        <input type="number" name="cors-max-age">
+        <br/>
+
+        <label>CORS Allowed Methods</label>
+        <input type="text" name="cors-allowed-methods">
+        <br/>
+
+        <label>CORS Allowed Headers</label>
+        <input type="text" name="cors-allowed-headers">
+        <br/>
+
+        <label>CORS Exposed Headers</label>
+        <input type="text" name="cors-exposed-headers">
+        <br/>
+
+        <label>Bearer Only</label>
+        Ja <input type="radio" name="bearer-only" value="true">
+        Nein <input type="radio" name="bearer-only" value="false">
+        <br/>
+
+        <label>Autodetect Bearer Only</label>
+        Ja <input type="radio" name="autodetect-bearer-only" value="true">
+        Nein <input type="radio" name="autodetect-bearer-only" value="false">
+        <br/>
+
+        <label>Enable Basic Auth</label>
+        Ja <input type="radio" name="enable-basic-auth" value="true">
+        Nein <input type="radio" name="enable-basic-auth" value="false">
+        <br/>
+
+        <label>Expose Token</label>
+        Ja <input type="radio" name="expose-token" value="true">
+        Nein <input type="radio" name="expose-token" value="false">
+        <br/>
+
+        <label>Connection Pool Size</label>
+        <input type="number" name="connection-pool-size">
+        <br/>
+
+        <label>Disable Trust Manager</label>
+        Ja <input type="radio" name="disable-trust-manager" value="true">
+        Nein <input type="radio" name="disable-trust-manager" value="false">
+        <br/>
+
+        <label>Allow Any Hostname</label>
+        Ja <input type="radio" name="allow-any-hostname" value="true">
+        Nein <input type="radio" name="allow-any-hostname" value="false">
+        <br/>
+
+        <label>Proxy URL</label>
+        <input type="url" name="proxy-url">
+        <br/>
+
+        <label>Path to Truststore</label>
+        <input type="text" name="truststore">
+        <br/>
+
+        <label>Truststore Password</label>
+        <input type="password" name="truststore-password">
+        <br/>
+
+        <label>Client Keystore</label>
+        <input type="text" name="client-keystore">
+        <br/>
+
+        <label>Client Keystore Password</label>
+        <input type="password" name="client-keystore-password">
+        <br/>
+
+        <label>Client Key Password</label>
+        <input type="password" name="client-key-password">
+        <br/>
+
+        <label>Always Refresh Token</label>
+        Ja <input type="radio" name="always-refresh-token" value="true">
+        Nein <input type="radio" name="always-refresh-token" value="false">
+        <br/>
+
+        <label>Register Node At Startup</label>
+        Ja <input type="radio" name="register-node-at-startup" value="true">
+        Nein <input type="radio" name="register-node-at-startup" value="false">
+        <br/>
+
+        <label>Register Node Period</label>
+        <input type="number" name="register-name-period">
+        <br/>
+
+        <label>Token Store</label>
+        <select name="token-store">
+            <option>Session</option>
+            <option>Cookie</option>
+        </select>
+        <br/>
+
+        <label>Token Cookie Path</label>
+        <input type="text" name="token-cookie-path">
+        <br/>
+
+        <label>Principal Attribute</label>
+        <select name="principal-attribute">
+            <option>sub</option>
+            <option>preferred_username</option>
+            <option>email</option>
+            <option>name</option>
+            <option>nickname</option>
+            <option>given_name</option>
+            <option>family_name</option>
+        </select>
+        <br/>
+
+        <label>Turn Off Change Session-ID On Login</label>
+        Ja <input type="radio" name="turn-off-change-session-id-on-login" value="true">
+        Nein <input type="radio" name="turn-off-change-session-id-on-login" value="false">
+        <br/>
+
+        <label>Token Minimum Time To Live in seconds</label>
+        <input type="number" name="token-minimum-time-to-live">
+        <br/>
+
+        <label> Min. Time Between JWKS-request in seconds</label>
+        <input type="number" name="min-time-between-jwks-requests">
+        <br/>
+
+        <label> Public Key Cache TTL in seconds</label>
+        <input type="number" name="public-key-cache-ttl">
+        <br/>
+
+        <label>Ignore OAuth Query Parameter</label>
+        Ja <input type="radio" name="ignpore-oauth-query-parameter" value="true">
+        Nein <input type="radio" name="ignore-oauth-query-parameter" value="false">
+        <br/>
+
+
+        <label>Verify Token Audience</label>
+        Ja <input type="radio" name="verify-token-audience" value="true">
+        Nein <input type="radio" name="verify-token-audience" value="false">
+        <br/>
 
         <button type="submit">Update Configuration</button>
     </form>
