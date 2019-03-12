@@ -33,6 +33,7 @@ import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
 import com.atlassian.sal.api.pluginsettings.PluginSettings;
 import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
 import com.schmalz.servlet.KeycloakConfigServlet;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -407,7 +408,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             /*order is important here */
             adapterConfig.setRealm(realm);
             adapterConfig.setResource(resource);
-            adapterConfig.setRealmKey(realmPublicKey);
+            if (!StringUtils.isEmpty(realmPublicKey))
+                adapterConfig.setRealmKey(realmPublicKey);
             adapterConfig.setAuthServerUrl(authServer);
             adapterConfig.setSslRequired(ssl);
             adapterConfig.setUseResourceRoleMappings(Boolean.valueOf((String) config.get(KeycloakConfigServlet.USE_RESOURCE_ROLE_MAPPINGS)));
@@ -443,13 +445,18 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             adapterConfig.setConnectionPoolSize(poolSize);
             adapterConfig.setDisableTrustManager(Boolean.valueOf(KeycloakConfigServlet.DISABLE_TRUST_MANAGER));
             adapterConfig.setAllowAnyHostname(Boolean.valueOf(KeycloakConfigServlet.ALLOW_ANY_HOSTNAME));
-            adapterConfig.setProxyUrl(proxy);
-            adapterConfig.setTruststore(truststore);
-            adapterConfig.setTruststorePassword(truststorePassword);
-            if (clientKeystore != null) {
+            if (!StringUtils.isEmpty(proxy))
+                adapterConfig.setProxyUrl(proxy);
+            if (!StringUtils.isEmpty(truststore))
+                adapterConfig.setTruststore(truststore);
+            if (!StringUtils.isEmpty(truststorePassword))
+                adapterConfig.setTruststorePassword(truststorePassword);
+            if (!StringUtils.isEmpty(clientKeystore)) {
                 adapterConfig.setClientKeystore(clientKeystore);
-                adapterConfig.setClientKeystorePassword((String) config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD));
-                adapterConfig.setClientKeyPassword((String) config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD));
+                if (!StringUtils.isEmpty((String) config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD)))
+                    adapterConfig.setClientKeystorePassword((String) config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD));
+                if (!StringUtils.isEmpty((String) config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD)))
+                    adapterConfig.setClientKeyPassword((String) config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD));
             }
 
             adapterConfig.setAlwaysRefreshToken(Boolean.valueOf((String) config.get(KeycloakConfigServlet.ALWAYS_REFRESH_TOKEN)));
