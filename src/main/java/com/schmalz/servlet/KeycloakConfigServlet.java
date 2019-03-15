@@ -11,6 +11,7 @@ import com.atlassian.sal.api.user.UserProfile;
 import com.atlassian.sal.api.user.UserRole;
 import com.atlassian.templaterenderer.TemplateRenderer;
 import com.schmalz.servlet.filter.AdaptedKeycloakOIDCFilter;
+import org.apache.commons.lang.StringUtils;
 import org.keycloak.KeycloakSecurityContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +41,9 @@ public class KeycloakConfigServlet extends HttpServlet {
     public static final String USE_RESOURCE_ROLE_MAPPINGS = "use-resource-role-mappings";
     public static final String ENABLE_CORS = "enable-cors";
     public static final String CORS_MAX_AGE = "cors-max-age";
-    public static final String CORS_ALLOWED_METHODS = "cors-allowed-methodes";
+    public static final String CORS_ALLOWED_METHODS = "cors-allowed-methods";
     public static final String CORS_ALLOWED_HEADERS = "cors-allowed-headers";
-    public static final String CORS_EXPOSED_HEADERS = "cors-exposed-header";
+    public static final String CORS_EXPOSED_HEADERS = "cors-exposed-headers";
     public static final String BEARER_ONLY = "bearer-only";
     public static final String AUTODETECT_BEARER_ONLY = "autodetect-bearer-only";
     public static final String ENABLE_BASIC_AUTH = "enable-basic-auth";
@@ -115,10 +116,11 @@ public class KeycloakConfigServlet extends HttpServlet {
             log.warn("User " + user.getUsername() + " does not have sufficient rights");
             return;
         }
-
         PluginSettings settings = pluginSettingsFactory.createSettingsForKey(AdaptedKeycloakOIDCFilter.SETTINGS_KEY);
+        String possibleError = (String) retrieveAndRemove(settings, AdaptedKeycloakOIDCFilter.EXCEPTION_DURING_UPDATE);
         Map<String, Object> config = getSettingsAsMap(settings);
         Map<String, Object> context = new HashMap<>();
+        context.put("updateError", possibleError);
         context.put("map", config);
         context.put("requestUrl", URLDecoder.decode(request.getRequestURL().toString(), StandardCharsets.UTF_8.name()));
         context.put("username", user.getUsername());
@@ -235,7 +237,9 @@ public class KeycloakConfigServlet extends HttpServlet {
 
         Map<String, Object> config = new HashMap<>();
         for (String key : validValues) {
-            config.put(key, settings.get(key));
+            String value = (String) settings.get(key);
+            value = StringUtils.isEmpty(value) ? "" : value;
+            config.put(key, value);
         }
         return config;
     }

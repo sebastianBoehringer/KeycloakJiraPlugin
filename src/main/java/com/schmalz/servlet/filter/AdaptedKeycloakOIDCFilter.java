@@ -60,6 +60,7 @@ import java.util.Map;
 @Scanned
 public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
     public static final String SETTINGS_KEY = AdaptedKeycloakOIDCFilter.class.getName() + "-keycloakJiraPlugin-SettingsKey";
+    public static final String EXCEPTION_DURING_UPDATE = "exception-during-update";
     private final Logger log = LoggerFactory.getLogger(this.getClass());
     private String authServer;
     private String realm;
@@ -144,6 +145,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
 
         } else {
             log.error("could not find configuration file, this plugin will disable itself");
+            disabled = true;
         }
     }
 
@@ -410,6 +412,8 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             adapterConfig.setResource(resource);
             if (!StringUtils.isEmpty(realmPublicKey))
                 adapterConfig.setRealmKey(realmPublicKey);
+            else
+                adapterConfig.setRealmKey(null);
             adapterConfig.setAuthServerUrl(authServer);
             adapterConfig.setSslRequired(ssl);
             adapterConfig.setUseResourceRoleMappings(Boolean.valueOf((String) config.get(KeycloakConfigServlet.USE_RESOURCE_ROLE_MAPPINGS)));
@@ -447,17 +451,24 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             adapterConfig.setAllowAnyHostname(Boolean.valueOf(KeycloakConfigServlet.ALLOW_ANY_HOSTNAME));
             if (!StringUtils.isEmpty(proxy))
                 adapterConfig.setProxyUrl(proxy);
+            else
+                adapterConfig.setProxyUrl(null);
             if (!StringUtils.isEmpty(truststore))
                 adapterConfig.setTruststore(truststore);
+            else
+                adapterConfig.setTruststore(null);
             if (!StringUtils.isEmpty(truststorePassword))
                 adapterConfig.setTruststorePassword(truststorePassword);
+            else
+                adapterConfig.setTruststore(null);
             if (!StringUtils.isEmpty(clientKeystore)) {
                 adapterConfig.setClientKeystore(clientKeystore);
                 if (!StringUtils.isEmpty((String) config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD)))
                     adapterConfig.setClientKeystorePassword((String) config.get(KeycloakConfigServlet.CLIENT_KEYSTORE_PASSWORD));
                 if (!StringUtils.isEmpty((String) config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD)))
                     adapterConfig.setClientKeyPassword((String) config.get(KeycloakConfigServlet.CLIENT_KEY_PASSWORD));
-            }
+            } else
+                adapterConfig.setClientKeystore(null);
 
             adapterConfig.setAlwaysRefreshToken(Boolean.valueOf((String) config.get(KeycloakConfigServlet.ALWAYS_REFRESH_TOKEN)));
             adapterConfig.setRegisterNodeAtStartup(Boolean.valueOf((String) config.get(KeycloakConfigServlet.REGISTER_NODE_AT_STARTUP)));
@@ -478,6 +489,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
             log.warn("updated settings");
         } catch (Exception e) {
             log.warn("failed during updated due to " + e.getMessage());
+            config.put(EXCEPTION_DURING_UPDATE, e.getMessage());
         }
 
 
@@ -520,7 +532,7 @@ public class AdaptedKeycloakOIDCFilter extends KeycloakOIDCFilter {
         toStore.put(KeycloakConfigServlet.REGISTER_NODE_AT_STARTUP, getString(config.isRegisterNodeAtStartup()));
         toStore.put(KeycloakConfigServlet.TOKEN_STORE, config.getTokenStore());
         toStore.put(KeycloakConfigServlet.TOKEN_COOKIE_PATH, config.getTokenCookiePath());
-        toStore.put(KeycloakConfigServlet.PRINCIPAL_ATTRIBUTE, "sub");
+        toStore.put(KeycloakConfigServlet.PRINCIPAL_ATTRIBUTE, config.getPrincipalAttribute());
         toStore.put(KeycloakConfigServlet.TURN_OFF_CHANGE_SESSION_ID_ON_LOGIN, getString(config.getTurnOffChangeSessionIdOnLogin()));
         toStore.put(KeycloakConfigServlet.TOKEN_MINIMUM_TIME_TO_LIVE, getString(config.getTokenMinimumTimeToLive()));
         toStore.put(KeycloakConfigServlet.MIN_TIME_BETWEEN_JWKS_REQUEST, getString(config.getMinTimeBetweenJwksRequests()));

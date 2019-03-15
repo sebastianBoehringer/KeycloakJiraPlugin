@@ -6,9 +6,13 @@
 <body>
 <div align="center">
     <h1>Here you can configure the plugin deployment</h1>
-    See the <a href="https://www.keycloak.org/docs/4.8/securing_apps/index.html#java-adapters">official
-    Documentation</a> {$d}
+    See the <a href="https://www.keycloak.org/docs/latest/securing_apps/index.html#java-adapters">official
+    Documentation</a> or look for the corresponding page in any of the
+    <a href="https://www.keycloak.org/documentation-archive.html">archived versions</a>
     for further details on what each option does.
+    #if($updateError)
+        <script>alert($updateError)</script>
+    #end
     <form method="post" action="$requestUrl">
         <table>
             <tr>
@@ -44,11 +48,11 @@
                 </td>
                 <td>
                     <fieldset id="public-client">
-                        Ja <input type="radio" value="true" name="public-client" id="publicClientTrue"
-                                  onclick="document.getElementById('secret').disabled = true; document.getElementById('secret').required=false"
+                        Yes <input type="radio" value="true" name="public-client" id="publicClientTrue"
+                                   onclick="document.getElementById('secret').disabled = true; document.getElementById('secret').required=false"
                                   #if ($map.public-client == $richtig)checked="checked" #end>
-                        Nein <input type="radio" value="false" name="public-client" id="publicClientFalse"
-                                    onclick="document.getElementById('secret').disabled = false; document.getElementById('secret').required=true"
+                        No <input type="radio" value="false" name="public-client" id="publicClientFalse"
+                                  onclick="document.getElementById('secret').disabled = false; document.getElementById('secret').required=true"
                         #if ($map.public-client == $falsch) checked="checked #end">
                     </fieldset>
                 </td>
@@ -59,7 +63,7 @@
                 </td>
                 <td>
                     <input type="text" name="secret" id="secret" value="$map.secret"
-                           size="100" #if ($map.public-client == $richtig)
+                           size="70" #if ($map.public-client == $richtig)
                            disabled="disabled" #{else} required="required"#end>
                 </td>
             </tr>
@@ -69,9 +73,9 @@
                 </td>
                 <td>
                     <select name="ssl-required">
-                        <option value="all">All</option>
-                        <option value="external">External</option>
-                        <option selected value="none">None</option>
+                        <option value="all" #if ($map.ssl-required =='all') selected #end>All</option>
+                        <option value="external" #if ($map.ssl-required =='external') selected #end>External</option>
+                        <option value="none"#if ($map.ssl-required =='none') selected #end>None</option>
                     </select>
                 </td>
             </tr>
@@ -80,7 +84,7 @@
                     <label>Confidential port</label>
                 </td>
                 <td>
-                    <input type="number" name="confidential-port" maxlength="5">
+                    <input type="number" name="confidential-port" maxlength="5" value="$map.confidential-port">
                 </td>
             </tr>
             <tr>
@@ -88,8 +92,10 @@
                     <label>Use resource role mappings</label>
                 </td>
                 <td>
-                    Ja <input name="use-resource-role-mappings" type="radio" value="true">
-                    Nein <input name="use-resource-role-mappings" type="radio" value="false">
+                    Yes <input name="use-resource-role-mappings" type="radio"
+                               value="true" #if ($map.use-resource-role-mappings == $richtig) checked="checked" #end>
+                    No <input name="use-resource-role-mappings" type="radio" value="false"
+                    #if ($map.use-resource-role-mappings != $richtig) checked="checked" #end>
                 </td>
             </tr>
             <tr>
@@ -97,10 +103,18 @@
                     <label>Enable CORS</label>
                 </td>
                 <td>
-                    Ja <input name="enable-cors" type="radio" value="true"
-                >
-                    Nein <input name="enable-cors" type="radio" value="false"
-                >
+                    Yes <input name="enable-cors" type="radio" value="true" #if($map.enable-cors == $richtig)
+                               checked="checked"
+                #end onclick="document.getElementById('allowedHeaders').disabled = false;
+                document.getElementById('maxAge').disabled = false;
+document.getElementById('allowedMethods').disabled = false;
+document.getElementById('exposedHeaders').disabled = false;">
+                    No <input name="enable-cors" type="radio" value="false"
+                              onclick="document.getElementById('allowedHeaders').disabled = true;
+                document.getElementById('maxAge').disabled = true;
+document.getElementById('allowedMethods').disabled = true;
+document.getElementById('exposedHeaders').disabled = true;"
+                    #if($map.enable-cors == $falsch) checked #end >
                 </td>
             </tr>
             <tr>
@@ -108,7 +122,8 @@
                     <label>CORS Max Age</label>
                 </td>
                 <td>
-                    <input type="number" name="cors-max-age">
+                    <input type="number" name="cors-max-age" id="maxAge" value="$map.cors-max-age" size="50"
+                           #if($map.enable-cors == $falsch)disabled #end>
                 </td>
             </tr>
             <tr>
@@ -116,7 +131,8 @@
                     <label>CORS Allowed Methods</label>
                 </td>
                 <td>
-                    <input type="text" name="cors-allowed-methods">
+                    <input type="text" name="cors-allowed-methods" id="allowedMethods" size="50"
+                           value="$map.cors-allowed-methods" #if($map.enable-cors == $falsch)disabled #end>
                 </td>
             </tr>
             <tr>
@@ -124,7 +140,8 @@
                     <label>CORS Allowed Headers</label>
                 </td>
                 <td>
-                    <input type="text" name="cors-allowed-headers">
+                    <input type="text" name="cors-allowed-headers" id="allowedHeaders" size="50"
+                           value="$map.cors-allowed-headers" #if($map.enable-cors == $falsch)disabled #end>
                 </td>
             </tr>
             <tr>
@@ -132,7 +149,8 @@
                     <label>CORS Exposed Headers</label>
                 </td>
                 <td>
-                    <input type="text" name="cors-exposed-headers">
+                    <input type="text" name="cors-exposed-headers" id="exposedHeaders" size="50"
+                           value="$map.cors-exposed-headers" #if($map.enable-cors == $falsch)disabled #end>
                 </td>
             </tr>
             <tr>
@@ -140,10 +158,10 @@
                     <label>Bearer Only</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="bearer-only" value="true"
-                >
-                    Nein <input type="radio" name="bearer-only" value="false"
-                >
+                    Yes <input type="radio" name="bearer-only" value="true"
+                               #if($map.bearer-only ==$richtig)checked #end>
+                    No <input type="radio" name="bearer-only" value="false"
+                              #if($map.bearer-only ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -151,8 +169,10 @@
                     <label>Autodetect Bearer Only</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="autodetect-bearer-only" value="true">
-                    Nein <input type="radio" name="autodetect-bearer-only" value="false">
+                    Yes <input type="radio" name="autodetect-bearer-only" value="true"
+                               #if($map.autodetect-bearer-only ==$richtig)checked #end>
+                    No <input type="radio" name="autodetect-bearer-only" value="false"
+                              #if($map.autodetect-bearer-only ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -160,8 +180,10 @@
                     <label>Enable Basic Auth</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="enable-basic-auth" value="true">
-                    Nein <input type="radio" name="enable-basic-auth" value="false">
+                    Yes <input type="radio" name="enable-basic-auth" value="true"
+                               #if($map.enable-basic-auth ==$richtig)checked #end>
+                    No <input type="radio" name="enable-basic-auth" value="false"
+                              #if($map.enable-basic-auth ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -169,8 +191,10 @@
                     <label>Expose Token</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="expose-token" value="true">
-                    Nein <input type="radio" name="expose-token" value="false">
+                    Yes <input type="radio" name="expose-token" value="true"
+                               #if($map.expose-token ==$richtig)checked #end>
+                    No <input type="radio" name="expose-token" value="false"
+                              #if($map.expose-token ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -178,7 +202,7 @@
                     <label>Connection Pool Size</label>
                 </td>
                 <td>
-                    <input type="number" name="connection-pool-size">
+                    <input type="number" name="connection-pool-size" value="$map.connection-pool-size" size="50">
                 </td>
             </tr>
             <tr>
@@ -186,10 +210,10 @@
                     <label>Disable Trust Manager</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="disable-trust-manager" value="true"
-                >
-                    Nein <input type="radio" name="disable-trust-manager" value="false"
-                >
+                    Yes <input type="radio" name="disable-trust-manager" value="true"
+                               #if($map.disable-trust-manager ==$richtig)checked #end>
+                    No <input type="radio" name="disable-trust-manager" value="false"
+                              #if($map.disable-trust-manager ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -197,10 +221,10 @@
                     <label>Allow Any Hostname</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="allow-any-hostname" value="true"
-                >
-                    Nein <input type="radio" name="allow-any-hostname" value="false"
-                >
+                    Yes <input type="radio" name="allow-any-hostname" value="true"
+                               #if($map.allow-any-hostname ==$richtig)checked #end>
+                    No <input type="radio" name="allow-any-hostname" value="false"
+                              #if($map.allow-any-hostname ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -208,7 +232,7 @@
                     <label>Proxy URL</label>
                 </td>
                 <td>
-                    <input type="url" name="proxy-url">
+                    <input type="url" name="proxy-url" value="$map.proxy-url" size="50">
                 </td>
             </tr>
             <tr>
@@ -216,7 +240,7 @@
                     <label>Path to Truststore</label>
                 </td>
                 <td>
-                    <input type="text" name="truststore">
+                    <input type="text" name="truststore" value="$map.truststore" size="50">
                 </td>
             </tr>
             <tr>
@@ -224,15 +248,15 @@
                     <label>Truststore Password</label>
                 </td>
                 <td>
-                    <input type="password" name="truststore-password">
+                    <input type="password" name="truststore-password" value="$map.truststore-password" size="50">
                 </td>
             </tr>
             <tr>
                 <td>
-                    <label>Client Keystore</label>
+                    <label>Path to Client Keystore</label>
                 </td>
                 <td>
-                    <input type="text" name="client-keystore">
+                    <input type="text" name="client-keystore" value="$map.client-keystore" size="50">
                 </td>
             </tr>
             <tr>
@@ -240,7 +264,8 @@
                     <label>Client Keystore Password</label>
                 </td>
                 <td>
-                    <input type="password" name="client-keystore-password">
+                    <input type="password" name="client-keystore-password" value="$map.client-keystore-password"
+                           size="50">
                 </td>
             </tr>
             <tr>
@@ -248,7 +273,7 @@
                     <label>Client Key Password</label>
                 </td>
                 <td>
-                    <input type="password" name="client-key-password">
+                    <input type="password" name="client-key-password" value="$map.client-key-password" size="50">
                 </td>
             </tr>
             <tr>
@@ -256,10 +281,10 @@
                     <label>Always Refresh Token</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="always-refresh-token" value="true"
-                >
-                    Nein <input type="radio" name="always-refresh-token" value="false"
-                >
+                    Yes <input type="radio" name="always-refresh-token" value="true"
+                               #if($map.always-refresh-token ==$richtig)checked #end>
+                    No <input type="radio" name="always-refresh-token" value="false"
+                              #if($map.always-refresh-token ==$falsch)checked #end >
                 </td>
             </tr>
             <tr>
@@ -267,10 +292,10 @@
                     <label>Register Node At Startup</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="register-node-at-startup" value="true"
-                >
-                    Nein <input type="radio" name="register-node-at-startup" value="false"
-                >
+                    Yes <input type="radio" name="register-node-at-startup" value="true"
+                               #if($map.register-node-at-startup ==$richtig)checked #end >
+                    No <input type="radio" name="register-node-at-startup" value="false"
+                              #if($map.register-node-at-startup ==$falsch)checked #end>
                 </td>
             </tr>
             <tr>
@@ -278,7 +303,7 @@
                     <label>Register Node Period</label>
                 </td>
                 <td>
-                    <input type="number" name="register-name-period">
+                    <input type="number" name="register-name-period" value="$map.register-name-period" size="50">
                 </td>
             </tr>
             <tr>
@@ -287,8 +312,12 @@
                 </td>
                 <td>
                     <select name="token-store">
-                        <option>Session</option>
-                        <option>Cookie</option>
+                        <option value="session" onclick="document.getElementById('cookiePath').disabled=true;
+document.getElementById('cookiePath').required=false">Session
+                        </option>
+                        <option value="cookie" onclick="document.getElementById('cookiePath').disabled=false;
+document.getElementById('cookiePath').required=true">Cookie
+                        </option>
                     </select>
                 </td>
             </tr>
@@ -297,7 +326,8 @@
                     <label>Token Cookie Path</label>
                 </td>
                 <td>
-                    <input type="text" name="token-cookie-path">
+                    <input type="text" name="token-cookie-path" value="$map.token-cookie-path" id="cookiePath" size="50"
+                        #if($map.token-store=='cookie') required #else disabled #end>
                 </td>
             </tr>
             <tr>
@@ -306,13 +336,27 @@
                 </td>
                 <td>
                     <select name="principal-attribute">
-                        <option>sub</option>
-                        <option>preferred_username</option>
-                        <option>email</option>
-                        <option>name</option>
-                        <option>nickname</option>
-                        <option>given_name</option>
-                        <option>family_name</option>
+                        <option value="preferred_username" #if($map.principal-attribute =='preferred_username') selected
+                        #end>preferred_username
+                        </option>
+                        <option value="sub" #if($map.principal-attribute =='sub') selected
+                        #end>sub
+                        </option>
+                        <option value="email" #if($map.principal-attribute =='email') selected
+                        #end>email
+                        </option>
+                        <option value="name" #if($map.principal-attribute =='name') selected
+                        #end>name
+                        </option>
+                        <option value="nickname" #if($map.principal-attribute =='nickname') selected
+                        #end>nickname
+                        </option>
+                        <option value="given_name" #if($map.principal-attribute =='given_name') selected
+                        #end>given_name
+                        </option>
+                        <option value="family_name" #if($map.principal-attribute =='family_name') selected
+                        #end>family_name
+                        </option>
                     </select>
                 </td>
             </tr>
@@ -321,10 +365,10 @@
                     <label>Turn Off Change Session-ID On Login</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="turn-off-change-session-id-on-login" value="true"
-                >
-                    Nein <input type="radio" name="turn-off-change-session-id-on-login" value="false"
-                >
+                    Yes <input type="radio" name="turn-off-change-session-id-on-login" value="true"
+                    #if($map.turn-off-change-session-id-on-login == $richtig) checked="checked" #end>
+                    No <input type="radio" name="turn-off-change-session-id-on-login" value="false"
+                    #if($map.turn-off-change-session-id-on-login == $falsch) checked="checked" #end>
                 </td>
             </tr>
             <tr>
@@ -332,7 +376,8 @@
                     <label>Token Minimum Time To Live in seconds</label>
                 </td>
                 <td>
-                    <input type="number" name="token-minimum-time-to-live">
+                    <input type="number" name="token-minimum-time-to-live" value="$map.token-minimum-time-to-live"
+                           size="50">
                 </td>
             </tr>
             <tr>
@@ -340,7 +385,8 @@
                     <label> Min. Time Between JWKS-request in seconds</label>
                 </td>
                 <td>
-                    <input type="number" name="min-time-between-jwks-requests">
+                    <input type="number" name="min-time-between-jwks-requests" size="50"
+                           value="$map.min-time-between-jwks-requests">
                 </td>
             </tr>
             <tr>
@@ -348,7 +394,7 @@
                     <label> Public Key Cache TTL in seconds</label>
                 </td>
                 <td>
-                    <input type="number" name="public-key-cache-ttl">
+                    <input type="number" name="public-key-cache-ttl" value="$map.public-key-cache-ttl">
                 </td>
             </tr>
             <tr>
@@ -356,10 +402,10 @@
                     <label>Ignore OAuth Query Parameter</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="ignpore-oauth-query-parameter" value="true"
-                >
-                    Nein <input type="radio" name="ignore-oauth-query-parameter" value="false"
-                >
+                    Yes <input type="radio" name="ignpore-oauth-query-parameter" value="true"
+                               #if($map.ignore-oauth-query-parameter ==$richtig)checked #end>
+                    No <input type="radio" name="ignore-oauth-query-parameter" value="false"
+                              #if($map.ignore-oauth-query-parameter ==$falsch)checked #end>
                 </td>
             </tr>
 
@@ -368,10 +414,10 @@
                     <label>Verify Token Audience</label>
                 </td>
                 <td>
-                    Ja <input type="radio" name="verify-token-audience" value="true"
-                >
-                    Nein <input type="radio" name="verify-token-audience" value="false"
-                >
+                    Yes <input type="radio" name="verify-token-audience" value="true"
+                               #if($map.verify-token-audience ==$richtig)checked #end>
+                    No <input type="radio" name="verify-token-audience" value="false"
+                              #if($map.verify-token-audience==$falsch)checked #end>
                 </td>
             </tr>
         </table>
